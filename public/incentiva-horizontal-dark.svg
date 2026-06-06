@@ -1,0 +1,20 @@
+<svg width="320" height="90" viewBox="0 0 320 90" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="incLineH" x1="0" y1="90" x2="160" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0EA5E9"/>
+      <stop offset="0.5" stop-color="#06B6D4"/>
+      <stop offset="1" stop-color="#10B981"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(8, 18)">
+    <line x1="6" y1="48" x2="34" y2="33" stroke="url(#incLineH)" stroke-width="3.5" stroke-linecap="round"/>
+    <line x1="34" y1="33" x2="62" y2="39" stroke="url(#incLineH)" stroke-width="3.5" stroke-linecap="round"/>
+    <line x1="62" y1="39" x2="90" y2="9" stroke="url(#incLineH)" stroke-width="3.5" stroke-linecap="round"/>
+    <circle cx="6" cy="48" r="5.5" fill="#0EA5E9"/>
+    <circle cx="34" cy="33" r="5.5" fill="#06B6D4"/>
+    <circle cx="62" cy="39" r="5.5" fill="#14C8B8"/>
+    <circle cx="90" cy="9" r="9" fill="#10B981"/>
+  </g>
+  <text x="118" y="50" font-family="system-ui, -apple-system, sans-serif" font-size="32" font-weight="700" fill="#FFFFFF" letter-spacing="0.5">Incentiva</text>
+  <text x="120" y="68" font-family="system-ui, -apple-system, sans-serif" font-size="9.5" font-weight="400" fill="#64748B" letter-spacing="2.5">DO INÍCIO AO RECURSO</text>
+</svg>
