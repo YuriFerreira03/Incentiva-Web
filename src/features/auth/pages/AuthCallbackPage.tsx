@@ -9,7 +9,7 @@ export function AuthCallbackPage() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
-        navigate("/dashboard", { replace: true });
+        navigate("/", { replace: true });
       } else {
         navigate("/login", { replace: true });
       }
