@@ -94,7 +94,6 @@ export function PerfilPage() {
     if (error) setMsgSenha({ tipo: "erro", texto: error.message });
     else {
       setMsgSenha({ tipo: "ok", texto: "Senha alterada com sucesso!" });
-      setSenhaAtual("");
       setNovaSenha("");
       setConfirmar("");
     }
