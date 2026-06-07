@@ -1,66 +1,96 @@
-import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
-  FolderOpen, Plus, Clock, CheckCircle2,
-  XCircle, Eye, ArrowRight, Sparkles
-} from 'lucide-react'
-import { supabase } from '../../../lib/supabase'
-import { useAuth } from '../../auth/hooks/useAuth'
+  FolderOpen,
+  Plus,
+  Clock,
+  CheckCircle2,
+  XCircle,
+  ArrowRight,
+  Sparkles,
+} from "lucide-react";
+import { supabase } from "../../../lib/supabase";
+import { useAuth } from "../../auth/hooks/useAuth";
 
 interface Projeto {
-  id: string
-  nome: string | null
-  manifestacao: string | null
-  status: string
-  confianca_geral: number | null
-  created_at: string
-  updated_at: string
+  id: string;
+  nome: string | null;
+  manifestacao: string | null;
+  status: string;
+  confianca_geral: number | null;
+  created_at: string;
+  updated_at: string;
 }
 
 const STATUS_CONFIG = {
-  rascunho:     { label: 'Rascunho',           icon: <Clock size={13} />,         cor: 'text-slate-400 bg-slate-500/15 border-slate-500/25' },
-  em_revisao:   { label: 'Em análise',         icon: <Sparkles size={13} />,      cor: 'text-cyan-300 bg-cyan-500/15 border-cyan-500/25' },
-  aprovado:     { label: 'Aprovado',           icon: <CheckCircle2 size={13} />,  cor: 'text-emerald-300 bg-emerald-500/15 border-emerald-500/25' },
-  rejeitado:    { label: 'Precisa de ajustes', icon: <XCircle size={13} />,       cor: 'text-amber-300 bg-amber-500/15 border-amber-500/25' },
-}
+  rascunho: {
+    label: "Rascunho",
+    icon: <Clock size={13} />,
+    cor: "text-slate-400 bg-slate-500/15 border-slate-500/25",
+  },
+  em_revisao: {
+    label: "Em análise",
+    icon: <Sparkles size={13} />,
+    cor: "text-cyan-300 bg-cyan-500/15 border-cyan-500/25",
+  },
+  aprovado: {
+    label: "Aprovado",
+    icon: <CheckCircle2 size={13} />,
+    cor: "text-emerald-300 bg-emerald-500/15 border-emerald-500/25",
+  },
+  rejeitado: {
+    label: "Precisa de ajustes",
+    icon: <XCircle size={13} />,
+    cor: "text-amber-300 bg-amber-500/15 border-amber-500/25",
+  },
+};
 
 function StatusBadge({ status }: { status: string }) {
-  const cfg = STATUS_CONFIG[status as keyof typeof STATUS_CONFIG] ?? STATUS_CONFIG.rascunho
+  const cfg =
+    STATUS_CONFIG[status as keyof typeof STATUS_CONFIG] ??
+    STATUS_CONFIG.rascunho;
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11.5px] font-medium border ${cfg.cor}`}>
+    <span
+      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11.5px] font-medium border ${cfg.cor}`}
+    >
       {cfg.icon} {cfg.label}
     </span>
-  )
+  );
 }
 
 function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })
+  return new Date(iso).toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
 }
 
 export function MeusProjetosPage() {
-  const navigate = useNavigate()
-  const { user } = useAuth()
-  const [projetos, setProjetos] = useState<Projeto[]>([])
-  const [loading, setLoading] = useState(true)
-  const [erro, setErro] = useState<string | null>(null)
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [projetos, setProjetos] = useState<Projeto[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [erro, setErro] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!user) return
+    if (!user) return;
     supabase
-      .from('projetos')
-      .select('id, nome, manifestacao, status, confianca_geral, created_at, updated_at')
-      .eq('user_id', user.id)
-      .order('updated_at', { ascending: false })
+      .from("projetos")
+      .select(
+        "id, nome, manifestacao, status, confianca_geral, created_at, updated_at",
+      )
+      .eq("user_id", user.id)
+      .order("updated_at", { ascending: false })
       .then(({ data, error }) => {
-        if (error) setErro(error.message)
-        else setProjetos(data ?? [])
-        setLoading(false)
-      })
-  }, [user])
+        if (error) setErro(error.message);
+        else setProjetos(data ?? []);
+        setLoading(false);
+      });
+  }, [user]);
 
   return (
     <div className="flex-1 max-w-4xl mx-auto w-full px-6 py-10">
-
       {/* Cabeçalho */}
       <div className="flex items-center justify-between mb-8">
         <div>
@@ -70,9 +100,9 @@ export function MeusProjetosPage() {
           </p>
         </div>
         <button
-          onClick={() => navigate('/modulo-a')}
+          onClick={() => navigate("/modulo-a")}
           className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-semibold text-white transition-all"
-          style={{ background: 'linear-gradient(135deg, #06B6D4, #3B82F6)' }}
+          style={{ background: "linear-gradient(135deg, #06B6D4, #3B82F6)" }}
         >
           <Plus size={15} /> Novo projeto
         </button>
@@ -98,14 +128,17 @@ export function MeusProjetosPage() {
           <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mb-5">
             <FolderOpen className="text-slate-600" size={28} />
           </div>
-          <h3 className="text-lg font-semibold text-white mb-2">Nenhum projeto ainda</h3>
+          <h3 className="text-lg font-semibold text-white mb-2">
+            Nenhum projeto ainda
+          </h3>
           <p className="text-slate-500 text-sm max-w-xs mb-6">
-            Use o Módulo A para estruturar seu primeiro projeto esportivo com a ajuda da IA.
+            Use o Módulo A para estruturar seu primeiro projeto esportivo com a
+            ajuda da IA.
           </p>
           <button
-            onClick={() => navigate('/modulo-a')}
+            onClick={() => navigate("/modulo-a")}
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-semibold text-white"
-            style={{ background: 'linear-gradient(135deg, #06B6D4, #3B82F6)' }}
+            style={{ background: "linear-gradient(135deg, #06B6D4, #3B82F6)" }}
           >
             <Sparkles size={15} /> Criar meu primeiro projeto
           </button>
@@ -115,7 +148,7 @@ export function MeusProjetosPage() {
       {/* Lista de projetos */}
       {!loading && projetos.length > 0 && (
         <div className="space-y-3">
-          {projetos.map(p => (
+          {projetos.map((p) => (
             <div
               key={p.id}
               className="rounded-2xl border border-white/10 bg-white/3 hover:bg-white/6 transition-all p-5 flex items-center gap-4 group cursor-pointer"
@@ -130,7 +163,7 @@ export function MeusProjetosPage() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-[14.5px] font-semibold text-white truncate">
-                    {p.nome ?? 'Projeto sem nome'}
+                    {p.nome ?? "Projeto sem nome"}
                   </span>
                   <StatusBadge status={p.status} />
                 </div>
@@ -160,17 +193,22 @@ export function MeusProjetosPage() {
       {/* Legenda de status */}
       {!loading && projetos.length > 0 && (
         <div className="mt-8 rounded-xl border border-white/8 bg-white/3 p-4">
-          <p className="text-[11px] text-slate-600 font-semibold uppercase tracking-wider mb-3">Status possíveis</p>
+          <p className="text-[11px] text-slate-600 font-semibold uppercase tracking-wider mb-3">
+            Status possíveis
+          </p>
           <div className="grid sm:grid-cols-2 gap-2">
-            {Object.entries(STATUS_CONFIG).map(([key, cfg]) => (
-              <div key={key} className="flex items-center gap-2 text-[12px] text-slate-400">
+            {Object.entries(STATUS_CONFIG).map(([key]) => (
+              <div
+                key={key}
+                className="flex items-center gap-2 text-[12px] text-slate-400"
+              >
                 <StatusBadge status={key} />
                 <span>·</span>
                 <span>
-                  {key === 'rascunho' && 'Não enviado para análise ainda'}
-                  {key === 'em_revisao' && 'Aguardando análise do especialista'}
-                  {key === 'aprovado' && 'Aprovado para submissão ao SLI'}
-                  {key === 'rejeitado' && 'Especialista solicitou ajustes'}
+                  {key === "rascunho" && "Não enviado para análise ainda"}
+                  {key === "em_revisao" && "Aguardando análise do especialista"}
+                  {key === "aprovado" && "Aprovado para submissão ao SLI"}
+                  {key === "rejeitado" && "Especialista solicitou ajustes"}
                 </span>
               </div>
             ))}
@@ -178,5 +216,5 @@ export function MeusProjetosPage() {
         </div>
       )}
     </div>
-  )
+  );
 }

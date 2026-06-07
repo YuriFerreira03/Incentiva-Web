@@ -6,6 +6,9 @@ interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: "primary" | "secondary" | "google" | "ghost";
   loading?: boolean;
   fullWidth?: boolean;
+  size?: "sm" | "md" | "lg";
+  iconRight?: ReactNode;
+  icon?: ReactNode; // para ícone centralizado (ex: loading)
 }
 
 const variants = {
@@ -21,6 +24,9 @@ export function Button({
   variant = "primary",
   loading = false,
   fullWidth = false,
+  size = "md",
+  icon,
+  iconRight,
   className,
   disabled,
   ...props
@@ -54,7 +60,9 @@ export function Button({
           />
         </svg>
       )}
+      {icon}
       {children}
+      {iconRight}
     </button>
   );
 }

@@ -125,53 +125,6 @@ function SectionLabel({
   );
 }
 
-function LandingBtn({
-  variant = "primary",
-  icon,
-  iconRight,
-  children,
-  onClick,
-  size = "md",
-}: {
-  variant?: "primary" | "secondary" | "ghost";
-  icon?: React.ReactNode;
-  iconRight?: React.ReactNode;
-  children: React.ReactNode;
-  onClick?: () => void;
-  size?: "md" | "lg";
-}) {
-  const sz = size === "lg" ? "px-6 py-3.5 text-[15px]" : "px-5 py-2.5 text-sm";
-  const v = {
-    primary: {
-      background: "linear-gradient(180deg, #3B82F6 0%, #1D4ED8 100%)",
-      color: "white",
-      boxShadow:
-        "0 8px 24px -8px rgba(59,130,246,0.6), 0 0 0 1px rgba(96,165,250,0.35) inset",
-    },
-    secondary: {
-      background: "rgba(30,41,59,0.6)",
-      color: "#E2E8F0",
-      boxShadow: "0 0 0 1px rgba(148,163,184,0.22) inset",
-    },
-    ghost: {
-      background: "transparent",
-      color: "#CBD5E1",
-      boxShadow: "0 0 0 1px rgba(148,163,184,0.18) inset",
-    },
-  }[variant];
-  return (
-    <button
-      onClick={onClick}
-      className={`btn-lift inline-flex items-center justify-center gap-2 rounded-xl font-medium ${sz}`}
-      style={v}
-    >
-      {icon}
-      <span>{children}</span>
-      {iconRight}
-    </button>
-  );
-}
-
 // ---------- Background trajectory SVG ----------
 function TrajectoryBg() {
   return (
@@ -541,7 +494,7 @@ function MiniAiShowcase() {
 // =====================================================================
 export function LandingPage() {
   const navigate = useNavigate();
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
 
   return (
     <div
