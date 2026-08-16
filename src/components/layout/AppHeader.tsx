@@ -120,6 +120,7 @@ export function AppHeader() {
           {[
             { label: "Plataforma", path: "/" },
             { label: "Módulo A", path: "/modulo-a" },
+            { label: "Módulo B", path: "/modulo-b" },
             { label: "Meus projetos", path: "/meus-projetos" },
           ].map((item) => (
             <button

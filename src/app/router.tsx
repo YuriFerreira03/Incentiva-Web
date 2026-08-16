@@ -9,6 +9,7 @@ import { LandingPage } from "../features/landing/pages/LandingPage";
 import { ModuloAPage } from "../features/moduloA/pages/ModuloAPage";
 import { MeusProjetosPage } from "../features/projetos/pages/MeusProjetosPage";
 import { PerfilPage } from "../features/perfil/pages/PerfilPage";
+import { ModuloBPage } from "../features/moduloB/pages/ModuloBPage";
 import { DashboardPage } from "../features/dashboard/pages/DashboardPage";
 
 export const router = createBrowserRouter([
@@ -67,6 +68,14 @@ export const router = createBrowserRouter([
         element: (
           <AppLayout>
             <PerfilPage />
+          </AppLayout>
+        ),
+      },
+      {
+        path: "/modulo-b",
+        element: (
+          <AppLayout>
+            <ModuloBPage />
           </AppLayout>
         ),
       },
