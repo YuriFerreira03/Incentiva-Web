@@ -1,12 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import {
   Search,
   SlidersHorizontal,
   ArrowUpDown,
   Building2,
   FileText,
-  ExternalLink,
   Sparkles,
   Info,
   RefreshCw,
@@ -116,7 +114,6 @@ function ProjetoCard({ p }: { p: ProjetoCaptacao }) {
 
 // ═══════════════════════════════════════════════════════════════════════════
 export function ModuloBPage() {
-  const navigate = useNavigate();
   const [projetos, setProjetos] = useState<ProjetoCaptacao[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);

@@ -35,7 +35,7 @@ function desenharLogo(doc: jsPDF, x: number, y: number, escala = 1) {
 }
 
 // ─── Cabeçalho e rodapé em toda página ────────────────────────────────────────
-function cabecalho(doc: jsPDF, nomeProjeto: string) {
+function cabecalho(doc: jsPDF) {
   desenharLogo(doc, MARGIN, 10, 1)
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(13)
@@ -116,11 +116,11 @@ export function gerarPDFProjeto(projeto: ProjetoGerado, opts?: { nomeProponente?
 
   const novaPagina = () => {
     doc.addPage()
-    cabecalho(doc, projeto.nome)
+    cabecalho(doc)
     y = 28
   }
 
-  cabecalho(doc, projeto.nome)
+  cabecalho(doc)
 
   // ── Capa resumida ──────────────────────────────────────────────────────────
   doc.setFont('helvetica', 'bold')
