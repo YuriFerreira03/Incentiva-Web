@@ -1,33 +1,34 @@
-import { createBrowserRouter } from 'react-router-dom'
-import { PublicRoute } from './PublicRoute'
-import { ProtectedRoute } from './ProtectedRoute'
-import { AppLayout } from '../components/layout/AppLayout'
-import { LoginPage } from '../features/auth/pages/LoginPage'
-import { RegisterPage } from '../features/auth/pages/RegisterPage'
-import { AuthCallbackPage } from '../features/auth/pages/AuthCallbackPage'
-import { LandingPage } from '../features/landing/pages/LandingPage'
-import { ModuloAPage } from '../features/moduloA/pages/ModuloAPage'
-import { MeusProjetosPage } from '../features/projetos/pages/MeusProjetosPage'
-import { PerfilPage } from '../features/perfil/pages/PerfilPage'
-import { DashboardPage } from '../features/dashboard/pages/DashboardPage'
+import { createBrowserRouter } from "react-router-dom";
+import { PublicRoute } from "./PublicRoute";
+import { ProtectedRoute } from "./ProtectedRoute";
+import { AppLayout } from "../components/layout/AppLayout";
+import { LoginPage } from "../features/auth/pages/LoginPage";
+import { RegisterPage } from "../features/auth/pages/RegisterPage";
+import { AuthCallbackPage } from "../features/auth/pages/AuthCallbackPage";
+import { LandingPage } from "../features/landing/pages/LandingPage";
+import { ModuloAPage } from "../features/moduloA/pages/ModuloAPage";
+import { MeusProjetosPage } from "../features/projetos/pages/MeusProjetosPage";
+import { ProjetoDetalhePage } from "../features/projetos/pages/ProjetoDetalhePage";
+import { PerfilPage } from "../features/perfil/pages/PerfilPage";
+import { ModuloBPage } from "../features/moduloB/pages/ModuloBPage";
+import { DashboardPage } from "../features/dashboard/pages/DashboardPage";
 
 export const router = createBrowserRouter([
-
   // ── Callback OAuth — sempre acessível ──────────────────────────────────
-  { path: '/auth/callback', element: <AuthCallbackPage /> },
+  { path: "/auth/callback", element: <AuthCallbackPage /> },
 
   // ── Páginas públicas (redireciona p/ / se já logado) ───────────────────
   {
     element: <PublicRoute />,
     children: [
-      { path: '/login',    element: <LoginPage /> },
-      { path: '/register', element: <RegisterPage /> },
+      { path: "/login", element: <LoginPage /> },
+      { path: "/register", element: <RegisterPage /> },
     ],
   },
 
   // ── Landing — pública mas com layout global ─────────────────────────────
   {
-    path: '/',
+    path: "/",
     element: (
       <AppLayout>
         <LandingPage />
@@ -40,25 +41,53 @@ export const router = createBrowserRouter([
     element: <ProtectedRoute />,
     children: [
       {
-        path: '/dashboard',
-        element: <AppLayout><DashboardPage /></AppLayout>,
+        path: "/dashboard",
+        element: (
+          <AppLayout>
+            <DashboardPage />
+          </AppLayout>
+        ),
       },
       {
-        path: '/modulo-a',
+        path: "/modulo-a",
         element: (
-          <AppLayout noFooter>
+          <AppLayout>
             <ModuloAPage />
           </AppLayout>
         ),
       },
       {
-        path: '/meus-projetos',
-        element: <AppLayout><MeusProjetosPage /></AppLayout>,
+        path: "/meus-projetos",
+        element: (
+          <AppLayout>
+            <MeusProjetosPage />
+          </AppLayout>
+        ),
       },
       {
-        path: '/perfil',
-        element: <AppLayout><PerfilPage /></AppLayout>,
+        path: "/projeto/:id",
+        element: (
+          <AppLayout>
+            <ProjetoDetalhePage />
+          </AppLayout>
+        ),
+      },
+      {
+        path: "/perfil",
+        element: (
+          <AppLayout>
+            <PerfilPage />
+          </AppLayout>
+        ),
+      },
+      {
+        path: "/modulo-b",
+        element: (
+          <AppLayout>
+            <ModuloBPage />
+          </AppLayout>
+        ),
       },
     ],
   },
-])
+]);
