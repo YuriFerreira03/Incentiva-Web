@@ -1,4 +1,4 @@
-import type { ProjetoGerado, PreAnalise } from '../types/moduloA'
+import type { ProjetoGerado, PreAnalise, ValidacaoResposta } from '../types/moduloA'
 
 const PROVIDER = (import.meta.env.VITE_AI_PROVIDER || 'groq') as string
 const API_KEY = import.meta.env.VITE_AI_API_KEY || ''
@@ -233,14 +233,109 @@ function mockAnalisarIdeia(ideia: string): PreAnalise {
   return { ehTextoValido: ehValido, suficiente, pontuacao, topicosCobertos: cobertos, topicosFaltantes: faltantes, mensagem }
 }
 
+// ─── Validação de uma única resposta do wizard (Fase 2) ──────────────────────
+// Chamada a cada "Próxima" clicado. Avalia só a resposta atual, com o
+// contexto das perguntas já respondidas (evita, por exemplo, aprovar uma
+// "modalidade" que não bate com o resto do que já foi dito).
+const VALIDACAO_RESPOSTA_SYSTEM = `Você avalia UMA ÚNICA resposta de um proponente de projeto esportivo, dentro de um formulário passo a passo para a Lei de Incentivo ao Esporte.
+
+Sua função é decidir se essa resposta específica tem conteúdo real e suficiente para aquele campo.
+
+REGRAS DE REPROVAÇÃO (seja rigoroso — a maioria dos campos exige uma frase com contexto, não uma palavra solta):
+- Reprove texto aleatório, vazio de sentido, ou respostas tipo "não sei", "qualquer", "nenhum", "-".
+- Reprove respostas de UMA ÚNICA PALAVRA OU MUITO GENÉRICAS quando o campo pede uma explicação (público, local, duração, importância, execução). Exemplos que DEVEM ser reprovados: "bom", "sim", "aqui", "legal", "crianças" (sozinho, sem idade/perfil), "escola" (sozinho, sem cidade/bairro), "importante" (sozinho, sem dizer por quê).
+- A pergunta de MODALIDADE é exceção: pode ser respondida só com o nome do esporte (ex: "futebol" é válido ali).
+- A pergunta de QUANTIDADE (participantes) pode ser respondida só com um número + o que é (ex: "80 crianças" é válido).
+- Para as demais perguntas (público, local, duração, importância, execução), exija uma frase com pelo menos um detalhe concreto (idade OU perfil OU cidade OU frequência OU motivo, dependendo do campo).
+- Não seja perfeccionista sobre gramática ou estilo — o corte é sobre CONTEÚDO insuficiente, não sobre redação.
+
+QUANDO REPROVAR, você DEVE gerar uma "sugestao": uma versão reescrita e melhorada da resposta do usuário, usando o que ele já escreveu como base e completando com um exemplo plausível e coerente com o contexto (as respostas anteriores do formulário). A sugestão deve parecer algo que o próprio usuário poderia ter escrito, não genérica demais — é para ele revisar e aceitar ou editar, não para ele copiar sem pensar.
+
+Responda SEMPRE em JSON válido, em português do Brasil, sem texto fora do JSON.`
+
+export async function validarResposta(
+  perguntaTitulo: string,
+  resposta: string,
+  contextoAnterior: Record<string, string>
+): Promise<ValidacaoResposta> {
+  const contexto = Object.entries(contextoAnterior)
+    .filter(([, v]) => v && v.trim())
+    .map(([k, v]) => `- ${k}: ${v}`)
+    .join('\n')
+
+  const prompt = `PERGUNTA FEITA AO PROPONENTE:
+"${perguntaTitulo}"
+
+RESPOSTA DADA:
+"""
+${resposta}
+"""
+
+RESPOSTAS JÁ DADAS ANTERIORMENTE NESTE MESMO FORMULÁRIO (contexto, para checar coerência e para basear a sugestão):
+${contexto || '(nenhuma ainda)'}
+
+Avalie SOMENTE a resposta atual (não as anteriores) e retorne JSON no formato:
+{
+  "aprovada": true ou false,
+  "mensagem": "o que falta/corrigir, curto e direto (se reprovada); ou vazio (se aprovada)",
+  "sugestao": "versão melhorada e reescrita da resposta, completando o que falta (APENAS se reprovada; omita ou deixe vazio se aprovada)"
+}`
+
+  if (!API_KEY) return mockValidarResposta(resposta, perguntaTitulo)
+
+  try {
+    const raw = await callAIComSistema(VALIDACAO_RESPOSTA_SYSTEM, prompt)
+    return parseJSON<ValidacaoResposta>(raw)
+  } catch {
+    return mockValidarResposta(resposta, perguntaTitulo)
+  }
+}
+
+// mock local: heurística simples, usada só se não houver API_KEY ou a chamada falhar
+function mockValidarResposta(resposta: string, perguntaTitulo: string): ValidacaoResposta {
+  const t = resposta.trim().toLowerCase()
+  const respostasFracas = ['nao sei', 'não sei', 'sei la', 'nenhum', 'nenhuma', 'n/a', 'na', '-', '?', 'qualquer', 'tanto faz']
+  const palavras = resposta.trim().split(/\s+/).filter(Boolean)
+
+  if (respostasFracas.includes(t)) {
+    return {
+      aprovada: false,
+      mensagem: 'Essa resposta não tem informação suficiente — tenta detalhar um pouco mais.',
+      sugestao: '',
+    }
+  }
+
+  // Modalidade e quantidade de participantes podem ser respondidas em 1-2 palavras
+  const perguntaCurta = /modalidade|quantas pessoas/i.test(perguntaTitulo)
+  const minimoPalavras = perguntaCurta ? 1 : 2
+
+  if (palavras.length < minimoPalavras || t.length < (perguntaCurta ? 3 : 6)) {
+    return {
+      aprovada: false,
+      mensagem: 'Resposta muito curta — adiciona mais um detalhe (idade, local, frequência, etc.).',
+      sugestao: `${resposta.trim()} — adicione mais detalhes aqui, como local, público ou frequência.`,
+    }
+  }
+  return { aprovada: true, mensagem: '' }
+}
+
 // ─── Prompt principal ────────────────────────────────────────────────────────
-export async function gerarProjeto(ideia: string): Promise<ProjetoGerado> {
+// `manifestacaoEscolhida`: quando o usuário já escolheu a manifestação no
+// wizard (1ª pergunta), ela é FIXA — a IA não decide, só justifica o
+// enquadramento em `adequacaoManifestacao`.
+export async function gerarProjeto(ideia: string, manifestacaoEscolhida?: string): Promise<ProjetoGerado> {
+  const instrucaoManifestacao = manifestacaoEscolhida
+    ? `O proponente JÁ ESCOLHEU a manifestação esportiva: "${manifestacaoEscolhida}". Você NÃO pode trocar essa escolha — o campo "manifestacao" da resposta deve ser EXATAMENTE "${manifestacaoEscolhida}". Sua função aqui é justificar esse enquadramento em "adequacaoManifestacao" e, se a ideia não se encaixar bem nessa manifestação, sinalizar isso em "avisos" (sem mudar o campo "manifestacao").`
+    : `Escolha a manifestação esportiva mais adequada dentre as 3 opções e justifique em "adequacaoManifestacao".`
+
   const prompt = `Analise a ideia abaixo e gere um projeto esportivo completo estruturado para a Lei de Incentivo ao Esporte, seguindo o padrão de projetos REALMENTE APROVADOS (estrutura granular, não genérica).
 
 IDEIA DO PROPONENTE:
 """
 ${ideia}
 """
+
+${instrucaoManifestacao}
 
 Com base nessa ideia, gere o projeto completo no seguinte formato JSON:
 
@@ -299,18 +394,37 @@ Com base nessa ideia, gere o projeto completo no seguinte formato JSON:
   },
   "pedirMaisContexto": true se a ideia original foi muito vaga,
   "perguntasAdicionais": ["pergunta 1 para melhorar o projeto", "pergunta 2"],
-  "avisos": ["aviso 1 sobre campo que precisará de revisão", "aviso 2"]
+  "avisos": ["aviso 1 sobre campo que precisará de revisão", "aviso 2"],
+  "sugestoesMelhoria": [
+    {
+      "campo": "chave do campo (ex: justificativa, metodologia, objetivoGeral, criteriosSelecao, resultadosEsperados, orcamento, metas)",
+      "campoLabel": "rótulo legível com o percentual atual, ex: Justificativa (60%)",
+      "mensagem": "o que foi melhorado e por quê, em 1 frase",
+      "sugestao": "OBRIGATÓRIO quando o campo for um texto simples (justificativa, metodologia, objeto, objetivoGeral, objetivosEspecificos, publicoBeneficiario, criteriosSelecao, locaisExecucao, cronograma, resultadosEsperados, acessibilidade, adequacaoManifestacao): escreva o TEXTO COMPLETO E MELHORADO desse campo, pronto para substituir o atual — não um resumo, o texto inteiro reescrito e mais forte. Quando o campo for 'orcamento' ou 'metas' (estruturas, não texto simples), OMITA esta chave — não é possível aplicar automaticamente."
+    }
+  ],
+  "sugestoesNome": ["alternativa de nome 1", "alternativa de nome 2", "alternativa de nome 3"]
 }
+
+IMPORTANTE SOBRE "sugestoesMelhoria": para cada campo de confiancaCampos abaixo de 80, gere UM item. Se o campo for de texto simples, o item DEVE incluir "sugestao" com o texto completo e pronto para aplicar direto (o usuário só vai clicar em "usar", sem editar antes — capriche). Se o campo for "orcamento" ou "metas", não inclua "sugestao" (são estruturas, não vale a pena reescrever como texto solto) — só a mensagem explicando o que ajustar manualmente. Se confiancaGeral já estiver 90+, pode retornar uma lista vazia.
+
+IMPORTANTE SOBRE "sugestoesNome": gere SEMPRE 3 alternativas de nome mais elaboradas e atrativas que a gerada em "nome" — mais específicas, com identidade própria, evitando nomes genéricos tipo "Projeto de X Comunitário". Podem referenciar a localidade, o público ou um conceito/slogan curto, mantendo profissionalismo adequado a um projeto oficial.
 
 IMPORTANTE SOBRE O ORÇAMENTO: gere no mínimo 8-12 itens granulares distribuídos nos 3 blocos (não categorias genéricas). Cada item deve ter quantidade e valor unitário realistas, com valorTotal calculado corretamente. As despesas do bloco "Atividade Meio" não podem somar mais que 15% do total geral. O bloco "Elaboração e Captação de Recursos" deve ficar entre 5% e 10% do total, nunca acima de R$ 100.000.`
 
-  if (!API_KEY) return mockGerarProjeto(ideia)
+  if (!API_KEY) return mockGerarProjeto(ideia, manifestacaoEscolhida)
 
   try {
     const raw = await callAI(prompt)
-    return parseJSON<ProjetoGerado>(raw)
+    const resultado = parseJSON<ProjetoGerado>(raw)
+    // Blindagem: garante que o campo bate com a escolha do usuário mesmo
+    // se a IA, por algum motivo, ignorar a instrução.
+    if (manifestacaoEscolhida) {
+      resultado.manifestacao = manifestacaoEscolhida as ProjetoGerado['manifestacao']
+    }
+    return resultado
   } catch {
-    return mockGerarProjeto(ideia)
+    return mockGerarProjeto(ideia, manifestacaoEscolhida)
   }
 }
 
@@ -338,7 +452,11 @@ Retorne o projeto completo atualizado no mesmo formato JSON, com os campos melho
 
   try {
     const raw = await callAI(prompt)
-    return parseJSON<ProjetoGerado>(raw)
+    const resultado = parseJSON<ProjetoGerado>(raw)
+    // Blindagem: se a IA esquecer esses campos na resposta, preserva os anteriores
+    resultado.sugestoesMelhoria = resultado.sugestoesMelhoria ?? projetoAtual.sugestoesMelhoria ?? []
+    resultado.sugestoesNome = resultado.sugestoesNome ?? projetoAtual.sugestoesNome ?? []
+    return resultado
   } catch {
     return projetoAtual
   }
@@ -346,7 +464,7 @@ Retorne o projeto completo atualizado no mesmo formato JSON, com os campos melho
 
 // ─── Mock para demonstração ───────────────────────────────────────────────────
 // ─── Mock para demonstração (sem API key) ────────────────────────────────────
-function mockGerarProjeto(ideia: string): ProjetoGerado {
+function mockGerarProjeto(ideia: string, manifestacaoEscolhida?: string): ProjetoGerado {
   const lower = ideia.toLowerCase()
   const modalidade = lower.includes('natação') ? 'natação'
     : lower.includes('futebol') ? 'futebol'
@@ -355,11 +473,12 @@ function mockGerarProjeto(ideia: string): ProjetoGerado {
     : 'esporte'
 
   const qtd = 80
+  const manifestacao = (manifestacaoEscolhida as ProjetoGerado['manifestacao']) || 'Formação Esportiva'
 
   return {
     nome: `Projeto de ${modalidade.charAt(0).toUpperCase() + modalidade.slice(1)} Comunitário`,
-    manifestacao: 'Formação Esportiva',
-    adequacaoManifestacao: `O projeto se enquadra em Formação Esportiva por promover o acesso à prática de ${modalidade} para crianças e adolescentes por meio de ações planejadas, inclusivas e educativas, com foco no desenvolvimento integral dos beneficiários, conforme o art. 5º, inciso I, do Decreto nº 12.861/2026.`,
+    manifestacao,
+    adequacaoManifestacao: `O projeto se enquadra em ${manifestacao} conforme escolhido pelo proponente, promovendo a prática de ${modalidade} de forma planejada, inclusiva e educativa, alinhada às diretrizes do Decreto nº 12.861/2026 para esse nível de prática esportiva.`,
     acessibilidade: 'Locais de execução com rampas de acesso e adaptações para cadeirantes; professores capacitados para adaptação de atividades a pessoas com deficiência e idosos; material de apoio em formato acessível.',
     objeto: `Desenvolvimento e prática regular de ${modalidade} para crianças e adolescentes, com foco em formação esportiva, educação e inclusão social.`,
     objetivoGeral: `Promover o acesso à prática regular de ${modalidade} para jovens em situação de vulnerabilidade social, contribuindo para o desenvolvimento físico, social e educacional dos beneficiários ao longo de 12 meses de execução.`,
@@ -438,6 +557,35 @@ function mockGerarProjeto(ideia: string): ProjetoGerado {
       'Orçamento gerado com valores estimados — ajustar conforme cotações reais de mercado.',
       'Dados do proponente precisam ser preenchidos manualmente.',
       'Confirmar percentual de beneficiários da rede pública (mínimo 50% exigido para Formação Esportiva).',
+    ],
+    sugestoesMelhoria: [
+      {
+        campo: 'justificativa',
+        campoLabel: 'Justificativa (60%)',
+        mensagem: 'Adicionado dado concreto sobre a vulnerabilidade da região para dar mais peso ao diagnóstico.',
+        sugestao: `A prática esportiva regular é reconhecida como ferramenta fundamental para o desenvolvimento integral de crianças e adolescentes, especialmente aqueles em situação de vulnerabilidade social. Segundo dados do IBGE, regiões com déficit de equipamentos esportivos públicos apresentam taxas de evasão escolar até 30% superiores à média nacional, o que reforça a urgência de iniciativas como esta.\n\nO território de execução do projeto apresenta déficit significativo de equipamentos esportivos públicos e de acesso a práticas esportivas orientadas. A ausência de opções estruturadas de lazer e esporte no contraturno escolar expõe essa população a riscos como o envolvimento com situações de violência e abandono escolar.\n\nO projeto se enquadra plenamente nas diretrizes da Lei de Incentivo ao Esporte (LC nº 222/2025 e Decreto nº 12.861/2026), que visam democratizar o acesso ao esporte e promover a formação esportiva de qualidade para toda a população brasileira, especialmente as mais vulneráveis.`,
+      },
+      {
+        campo: 'metodologia',
+        campoLabel: 'Metodologia (55%)',
+        mensagem: 'Detalhada a grade horária e o número de turmas, hoje generalizado.',
+        sugestao: `O projeto será executado por meio de aulas regulares de ${modalidade}, ministradas por profissionais de Educação Física habilitados, organizadas em 4 turmas de até 20 alunos cada, com aulas às terças, quintas e sábados, das 14h às 15h30. As atividades seguirão uma progressão pedagógica adequada a cada faixa etária, combinando fundamentos técnicos, táticos e formativos.\n\nCada sessão terá duração de 90 minutos e incluirá aquecimento, parte técnica, jogo aplicado e momento de reflexão sobre valores do esporte. Serão realizadas avaliações periódicas dos beneficiários a cada 3 meses, com registro de frequência, evolução técnica e indicadores socioeducacionais. A equipe executora realizará reuniões quinzenais para alinhamento pedagógico e ajuste das atividades.`,
+      },
+      {
+        campo: 'orcamento',
+        campoLabel: 'Orçamento (50%)',
+        mensagem: 'Detalhe a origem dos valores unitários (cotação de mercado, fornecedor de referência) em cada item — isso não pode ser aplicado automaticamente, ajuste item por item na seção de orçamento.',
+      },
+      {
+        campo: 'metas',
+        campoLabel: 'Metas (65%)',
+        mensagem: 'Adicione um prazo intermediário de verificação em pelo menos uma meta quantitativa, além do prazo final — ajuste diretamente nos cards de meta.',
+      },
+    ],
+    sugestoesNome: [
+      `${modalidade.charAt(0).toUpperCase() + modalidade.slice(1)} que Transforma`,
+      `Movimento ${modalidade.charAt(0).toUpperCase() + modalidade.slice(1)}: Esporte e Cidadania`,
+      `Semeando Futuro pelo ${modalidade.charAt(0).toUpperCase() + modalidade.slice(1)}`,
     ],
   }
 }

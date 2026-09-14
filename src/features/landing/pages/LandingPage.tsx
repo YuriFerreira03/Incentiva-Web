@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../../../components/ui/Button";
 import {
@@ -164,125 +165,6 @@ function TrajectoryBg() {
         fill="none"
       />
     </svg>
-  );
-}
-
-// ---------- Hero visual (radar / trajectory) ----------
-function HeroVisual() {
-  return (
-    <div className="relative aspect-[5/4] rounded-3xl glass-hi overflow-hidden lume">
-      <div className="absolute inset-0 grid-bg-fine opacity-80" />
-      <div className="absolute inset-0 glow-blue" />
-      <svg viewBox="0 0 500 400" className="absolute inset-0 w-full h-full">
-        <defs>
-          <radialGradient id="radarG" cx="50%" cy="50%" r="50%">
-            <stop offset="0" stopColor="#3B82F6" stopOpacity="0.35" />
-            <stop offset="1" stopColor="#3B82F6" stopOpacity="0" />
-          </radialGradient>
-          <linearGradient id="arcG" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0" stopColor="#3B82F6" />
-            <stop offset="1" stopColor="#10D9A3" />
-          </linearGradient>
-        </defs>
-        <circle cx="250" cy="210" r="160" fill="url(#radarG)" />
-        {[60, 100, 140, 180].map((r) => (
-          <circle
-            key={r}
-            cx="250"
-            cy="210"
-            r={r}
-            fill="none"
-            stroke="rgba(148,163,184,0.16)"
-            strokeDasharray="2 4"
-          />
-        ))}
-        <line
-          x1="250"
-          y1="30"
-          x2="250"
-          y2="390"
-          stroke="rgba(148,163,184,0.1)"
-        />
-        <line
-          x1="60"
-          y1="210"
-          x2="440"
-          y2="210"
-          stroke="rgba(148,163,184,0.1)"
-        />
-        <path
-          d="M 80 340 C 180 220, 260 140, 420 80"
-          fill="none"
-          stroke="url(#arcG)"
-          strokeWidth="2.2"
-          strokeLinecap="round"
-        />
-        <path
-          d="M 80 340 C 180 220, 260 140, 420 80"
-          fill="none"
-          stroke="url(#arcG)"
-          strokeWidth="6"
-          strokeLinecap="round"
-          opacity="0.22"
-        />
-        {[
-          { cx: 80, cy: 340, t: "Ideia" },
-          { cx: 178, cy: 232, t: "Estruturação" },
-          { cx: 260, cy: 160, t: "Aprovação" },
-          { cx: 340, cy: 120, t: "Captação" },
-          { cx: 420, cy: 80, t: "Recurso" },
-        ].map((p) => (
-          <g key={p.t}>
-            <circle
-              cx={p.cx}
-              cy={p.cy}
-              r="7"
-              fill="#0B111F"
-              stroke="url(#arcG)"
-              strokeWidth="2.5"
-            />
-            <text
-              x={p.cx}
-              y={p.cy - 14}
-              textAnchor="middle"
-              fill="#CBD5E1"
-              fontSize="11"
-              fontFamily="Manrope, sans-serif"
-            >
-              {p.t}
-            </text>
-          </g>
-        ))}
-        <g className="spin-slow" style={{ transformOrigin: "250px 210px" }}>
-          <line
-            x1="250"
-            y1="210"
-            x2="250"
-            y2="50"
-            stroke="rgba(59,130,246,0.55)"
-            strokeWidth="1.2"
-          />
-        </g>
-      </svg>
-      <div className="absolute top-5 left-5 glass rounded-xl px-3 py-2 text-[11.5px] text-slate-200 flex items-center gap-2 fade-up fade-up-2">
-        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-        Copiloto IA ativo
-      </div>
-      <div className="absolute bottom-5 left-5 glass rounded-xl px-3 py-2 text-[11.5px] text-slate-300 fade-up fade-up-4">
-        Score de prontidão{" "}
-        <span className="text-white font-semibold ml-1">88</span>
-      </div>
-      <div className="absolute top-5 right-5 glass rounded-xl px-3 py-2 text-[11.5px] text-slate-300 fade-up fade-up-3">
-        Matching aderência{" "}
-        <span className="text-emerald-300 font-semibold ml-1">94%</span>
-      </div>
-      <div className="absolute bottom-5 right-5 glass rounded-xl px-3 py-2 text-[11.5px] text-slate-300 fade-up fade-up-5">
-        Recurso previsto{" "}
-        <span className="text-amber-300 font-semibold ml-1">
-          R$&nbsp;780.000
-        </span>
-      </div>
-    </div>
   );
 }
 
@@ -495,6 +377,16 @@ function MiniAiShowcase() {
 export function LandingPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const [ideiaLanding, setIdeiaLanding] = useState("");
+
+  // Guarda a ideia temporariamente e manda para o cadastro/login (se precisar)
+  // ou direto para o Módulo A (se já estiver logado). O ModuloAPage lê e
+  // consome essa chave do sessionStorage assim que a página carrega.
+  function handleComecarComIdeia() {
+    if (!ideiaLanding.trim()) return;
+    sessionStorage.setItem("incentiva_ideia_pendente", ideiaLanding.trim());
+    navigate(user ? "/modulo-a" : "/register");
+  }
 
   return (
     <div
@@ -518,8 +410,8 @@ export function LandingPage() {
                 Lei de Incentivo ao Esporte · plataforma inteligente
               </Chip>
             </div>
-            <div className="grid lg:grid-cols-12 gap-12 mt-8 items-center">
-              <div className="lg:col-span-7">
+            <div className="mt-8">
+              <div>
                 <h1
                   className="font-display font-semibold text-[58px] leading-[1.02] tracking-tight text-white fade-up fade-up-1"
                   style={{ textWrap: "balance" } as React.CSSProperties}
@@ -538,7 +430,7 @@ export function LandingPage() {
                     do início ao recurso.
                   </span>
                 </h1>
-                <p className="mt-6 text-slate-300 text-[17px] leading-relaxed max-w-[620px] fade-up fade-up-2">
+                <p className="mt-6 text-slate-300 text-[17px] leading-relaxed max-w-[820px] fade-up fade-up-2">
                   O INCENTIVA conduz proponentes e incentivadores ao longo de
                   toda a jornada da Lei de Incentivo ao Esporte — da ideia
                   estruturada ao recurso depositado — com uma IA copiloto que
@@ -583,7 +475,41 @@ export function LandingPage() {
                     </>
                   )}
                 </div>
-                <div className="mt-10 grid grid-cols-3 gap-5 max-w-[620px] fade-up fade-up-4">
+
+                {/* Caixa de texto: escreva a ideia antes mesmo de logar */}
+                <div
+                  className="mt-8 rounded-2xl glass p-5 max-w-[820px] fade-up fade-up-3"
+                  style={{ boxShadow: "0 0 0 1px rgba(148,163,184,0.12) inset" }}
+                >
+                  <div className="flex items-center gap-2 mb-3">
+                    <Sparkles size={15} className="text-cyan-400" />
+                    <span className="text-[13px] font-semibold text-white">
+                      Já sabe o que quer? Escreva a ideia do seu projeto
+                    </span>
+                  </div>
+                  <textarea
+                    value={ideiaLanding}
+                    onChange={(e) => setIdeiaLanding(e.target.value)}
+                    placeholder="Ex: Quero criar um projeto de futebol para crianças de 8 a 14 anos em situação de vulnerabilidade social..."
+                    rows={3}
+                    className="w-full rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-500 text-[13.5px] leading-relaxed px-4 py-3 outline-none focus:border-cyan-500/50 focus:bg-white/8 transition-all resize-none"
+                  />
+                  <div className="flex items-center justify-between gap-3 mt-3">
+                    <span className="text-[11.5px] text-slate-500">
+                      A IA vai usar isso para te ajudar a estruturar o projeto depois.
+                    </span>
+                    <Button
+                      icon={<Sparkles size={14} />}
+                      iconRight={<ArrowRight size={14} />}
+                      onClick={handleComecarComIdeia}
+                      disabled={!ideiaLanding.trim()}
+                    >
+                      Continuar
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="mt-10 grid grid-cols-3 gap-5 max-w-[820px] fade-up fade-up-4">
                   {[
                     { k: "R$ 420 Mi+", v: "em projetos apoiados" },
                     { k: "1.820", v: "projetos estruturados" },
@@ -605,9 +531,6 @@ export function LandingPage() {
                     </div>
                   ))}
                 </div>
-              </div>
-              <div className="lg:col-span-5 fade-up fade-up-3">
-                <HeroVisual />
               </div>
             </div>
           </div>

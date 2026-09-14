@@ -29,6 +29,14 @@ export type Manifestacao =
   | 'Excelência Esportiva'
   | ''
 
+// ─── Sugestão de melhoria ligada a um campo específico ───────────────────────
+export interface SugestaoMelhoria {
+  campo: string        // chave do campo do projeto que essa sugestão melhora (ex: "justificativa")
+  campoLabel: string   // rótulo legível com o percentual atual, ex: "Justificativa (60%)"
+  mensagem: string     // explicação curta do que foi melhorado e por quê
+  sugestao?: string    // texto completo e melhorado, pronto para aplicar (só quando o campo é texto simples)
+}
+
 export interface ProjetoGerado {
   nome: string
   manifestacao: Manifestacao
@@ -54,6 +62,8 @@ export interface ProjetoGerado {
   confiancaCampos: Record<string, number>
   avisos: string[]
   perguntasAdicionais: string[]
+  sugestoesMelhoria: SugestaoMelhoria[]  // ações concretas para elevar a confiança geral
+  sugestoesNome: string[]      // 3-4 alternativas de nome mais bem elaboradas
   pedirMaisContexto: boolean
 }
 
@@ -65,6 +75,21 @@ export type StatusProjeto =
 
 export type TelaModuloA = 'ideia' | 'gerando' | 'revisao' | 'enviando' | 'enviado'
 
+// ─── Pergunta do wizard: texto livre ou múltipla escolha (ex: manifestação) ──
+export interface OpcaoPergunta {
+  valor: string
+  label: string
+}
+
+export interface PerguntaWizard {
+  chave: string
+  titulo: string
+  helper: string
+  tipo?: 'texto' | 'escolha'   // default: 'texto'
+  placeholder?: string        // usado quando tipo === 'texto'
+  opcoes?: OpcaoPergunta[]    // usado quando tipo === 'escolha'
+}
+
 // ─── Pré-análise da ideia (antes de gerar) ───────────────────────────────────
 export interface PreAnalise {
   suficiente: boolean          // true = pode gerar o projeto
@@ -73,4 +98,11 @@ export interface PreAnalise {
   topicosFaltantes: string[]   // ex: ["local", "duração"]
   mensagem: string             // feedback curto e humano para o usuário
   ehTextoValido: boolean       // false = texto sem sentido / aleatório
+}
+
+// ─── Validação de uma única resposta do wizard (Fase 2) ──────────────────────
+export interface ValidacaoResposta {
+  aprovada: boolean     // true = pode avançar para a próxima pergunta
+  mensagem: string      // o que falta/corrigir (se reprovada) ou confirmação curta (se aprovada)
+  sugestao?: string     // versão melhorada da resposta, pronta para o usuário aceitar (se reprovada)
 }

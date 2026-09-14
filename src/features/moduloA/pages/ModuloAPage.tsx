@@ -20,9 +20,9 @@ import {
   FileDown,
 } from "lucide-react";
 import { useAuth } from "../../auth/hooks/useAuth";
-import { gerarProjeto, refazerProjeto, analisarIdeia } from "../services/moduloAService";
+import { gerarProjeto, refazerProjeto, analisarIdeia, validarResposta } from "../services/moduloAService";
 import { gerarPDFProjeto } from "../services/pdfGerador";
-import type { ProjetoGerado, TelaModuloA, PreAnalise, Meta, ItemOrcamento } from "../types/moduloA";
+import type { ProjetoGerado, TelaModuloA, PreAnalise, Meta, ItemOrcamento, PerguntaWizard, ValidacaoResposta } from "../types/moduloA";
 import { supabase } from "../../../lib/supabase";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -393,47 +393,77 @@ function SecaoRevisao({
 // ─── Guia: 7 tópicos. A cobertura vem da ANÁLISE DA IA, não de palavra-chave. ──
 // "chave" casa com os nomes que a IA retorna em topicosCobertos/topicosFaltantes.
 // ─── Perguntas do wizard passo a passo (mesma ordem/chaves do guia) ──────────
-const PERGUNTAS_WIZARD = [
+// A manifestação vem primeiro: define o enquadramento legal do projeto e
+// muda o que é possível estruturar depois (teto de captação, cota de rede
+// pública, etc.) — por isso é escolha fechada, não texto livre.
+const PERGUNTAS_WIZARD: PerguntaWizard[] = [
+  {
+    chave: "manifestacao",
+    titulo: "Qual é a manifestação esportiva do seu projeto?",
+    helper: "Isso define as regras que se aplicam ao seu projeto perante a Lei de Incentivo ao Esporte.",
+    tipo: "escolha",
+    opcoes: [
+      {
+        valor: "Formação Esportiva",
+        label: "Formação Esportiva — para crianças e adolescentes, com foco educativo e inclusão social.",
+      },
+      {
+        valor: "Esporte para Toda a Vida",
+        label: "Esporte para Toda a Vida — para jovens e adultos, foco em hábitos saudáveis e lazer (sem alto rendimento).",
+      },
+      {
+        valor: "Excelência Esportiva",
+        label: "Excelência Esportiva — treinamento sistemático para alto rendimento e formação de atletas.",
+      },
+    ],
+  },
   {
     chave: "modalidade",
     titulo: "Qual é a modalidade esportiva do projeto?",
     helper: "O tipo de esporte que será praticado.",
+    tipo: "texto",
     placeholder: "Ex: Futebol, natação, atletismo, judô...",
   },
   {
     chave: "público",
     titulo: "Para qual público é o projeto?",
     helper: "Idade, perfil e situação social dos beneficiários.",
+    tipo: "texto",
     placeholder: "Ex: Crianças de 8 a 14 anos em situação de vulnerabilidade social",
   },
   {
     chave: "local",
     titulo: "Onde o projeto será executado?",
     helper: "Cidade, bairro ou local específico.",
+    tipo: "texto",
     placeholder: "Ex: Bairro Floresta, em Belo Horizonte - MG",
   },
   {
     chave: "participantes",
     titulo: "Quantas pessoas serão atendidas?",
     helper: "Número estimado de beneficiários diretos.",
+    tipo: "texto",
     placeholder: "Ex: 80 crianças",
   },
   {
     chave: "duração",
     titulo: "Por quanto tempo o projeto vai durar?",
     helper: "Duração total e frequência das atividades.",
+    tipo: "texto",
     placeholder: "Ex: 12 meses, com aulas 3 vezes por semana",
   },
   {
     chave: "importância",
     titulo: "Por que esse projeto é importante?",
     helper: "O problema social ou esportivo que o projeto resolve.",
+    tipo: "texto",
     placeholder: "Ex: A região tem alta vulnerabilidade social e pouco acesso a atividades esportivas",
   },
   {
     chave: "execução",
     titulo: "Como o projeto será executado?",
     helper: "Metodologia, equipe e parcerias envolvidas.",
+    tipo: "texto",
     placeholder: "Ex: Aulas com professores de educação física, em parceria com o clube local",
   },
 ] as const;
@@ -453,6 +483,24 @@ function pareceTextoSuspeito(texto: string): boolean {
   return vogais / letras.length < 0.2;
 }
 
+// ─── Campos de texto simples onde uma "sugestão de melhoria" pode ser
+// aplicada diretamente com um clique (via handleSave). Orçamento e metas
+// são estruturas (não texto solto) e ficam de fora de propósito.
+const CAMPOS_TEXTO_APLICAVEIS = new Set([
+  "objeto",
+  "objetivoGeral",
+  "objetivosEspecificos",
+  "justificativa",
+  "metodologia",
+  "publicoBeneficiario",
+  "criteriosSelecao",
+  "locaisExecucao",
+  "cronograma",
+  "resultadosEsperados",
+  "acessibilidade",
+  "adequacaoManifestacao",
+]);
+
 export function ModuloAPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -470,6 +518,7 @@ export function ModuloAPage() {
   const [passo, setPasso] = useState(0);
   const [modoResumo, setModoResumo] = useState(false);
   const [respostas, setRespostas] = useState<Record<string, string>>({
+    manifestacao: "",
     modalidade: "",
     público: "",
     local: "",
@@ -478,6 +527,10 @@ export function ModuloAPage() {
     importância: "",
     execução: "",
   });
+
+  // ─── Validação por etapa (Fase 2) — uma checagem de IA por pergunta ──────
+  const [validandoPasso, setValidandoPasso] = useState(false);
+  const [validacaoAtual, setValidacaoAtual] = useState<ValidacaoResposta | null>(null);
 
   // ─── Analisar e gerar ────────────────────────────────────────────────────
   // Um único botão: primeiro a IA pré-analisa; só gera se a ideia for suficiente.
@@ -500,7 +553,7 @@ export function ModuloAPage() {
       // Passou — gera o projeto completo
       setAnalisando(false);
       setTela("gerando");
-      const result = await gerarProjeto(texto);
+      const result = await gerarProjeto(texto, respostas.manifestacao || undefined);
       setProjeto(result);
       setTela("revisao");
     } catch (e) {
@@ -513,6 +566,7 @@ export function ModuloAPage() {
   // ─── Compõe o texto único a partir das respostas do wizard ───────────────
   function compilarIdeia(r: Record<string, string>): string {
     return [
+      `Manifestação esportiva escolhida pelo proponente: ${r.manifestacao}.`,
       `Modalidade esportiva: ${r.modalidade}.`,
       `Público-alvo: ${r.público}.`,
       `Local de execução: ${r.local}.`,
@@ -532,7 +586,7 @@ export function ModuloAPage() {
       setErro(null);
       setTela("gerando");
       try {
-        const result = await gerarProjeto(texto);
+        const result = await gerarProjeto(texto, respostas.manifestacao || undefined);
         setProjeto(result);
         setTela("revisao");
       } catch (e) {
@@ -705,13 +759,44 @@ export function ModuloAPage() {
 
     function atualizarResposta(valor: string) {
       setRespostas((prev) => ({ ...prev, [perguntaAtual.chave]: valor }));
+      // Limpa a validação anterior ao editar — evita mostrar um erro velho
+      // enquanto a pessoa já está corrigindo a resposta.
+      if (validacaoAtual) setValidacaoAtual(null);
     }
 
-    function irParaProxima() {
-      if (!podeAvancar) return;
+    async function irParaProxima() {
+      if (!podeAvancar || validandoPasso) return;
+
+      // Perguntas de múltipla escolha (manifestação) não passam por validação
+      // de IA — não há como escrever "resposta ruim" clicando num botão.
+      if (perguntaAtual.tipo === "escolha") {
+        avancarOuFinalizar();
+        return;
+      }
+
+      setValidandoPasso(true);
+      setValidacaoAtual(null);
+      try {
+        const resultado = await validarResposta(perguntaAtual.titulo, respostaAtual, respostas);
+        setValidandoPasso(false);
+        if (!resultado.aprovada) {
+          setValidacaoAtual(resultado);
+          return; // trava aqui — não avança até corrigir
+        }
+        avancarOuFinalizar();
+      } catch {
+        // Se a validação falhar por erro de rede/API, não trava o usuário —
+        // deixa passar e confia na checagem final da tela de resumo.
+        setValidandoPasso(false);
+        avancarOuFinalizar();
+      }
+    }
+
+    function avancarOuFinalizar() {
       if (ehUltimaPergunta) {
         finalizarERevisar();
       } else {
+        setValidacaoAtual(null);
         setPasso((p) => p + 1);
       }
     }
@@ -732,7 +817,10 @@ export function ModuloAPage() {
     }
 
     function irParaAnterior() {
-      if (passo > 0) setPasso((p) => p - 1);
+      if (passo > 0) {
+        setValidacaoAtual(null);
+        setPasso((p) => p - 1);
+      }
     }
 
     return (
@@ -780,28 +868,91 @@ export function ModuloAPage() {
               </p>
 
               <div className="w-full space-y-4">
-                <textarea
-                  key={perguntaAtual.chave}
-                  className="w-full rounded-2xl border border-white/10 bg-white/5 text-white placeholder-slate-500 text-[15px] leading-relaxed px-5 py-4 outline-none focus:border-cyan-500/50 focus:bg-white/8 transition-all resize-none"
-                  style={{ minHeight: 130 }}
-                  placeholder={perguntaAtual.placeholder}
-                  value={respostaAtual}
-                  onChange={(e) => atualizarResposta(e.target.value)}
-                  autoFocus
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      irParaProxima();
-                    }
-                  }}
-                />
-
-                {/* Aviso leve, não bloqueia — só a IA no final trava de verdade */}
-                {pareceTextoSuspeito(respostaAtual) && (
-                  <div className="flex items-center gap-2 text-[12.5px] text-amber-400/90 px-1 -mt-2">
-                    <AlertTriangle size={13} className="shrink-0" />
-                    Isso não parece uma resposta válida — tenta escrever com suas palavras.
+                {perguntaAtual.tipo === "escolha" ? (
+                  <div className="space-y-3">
+                    {perguntaAtual.opcoes?.map((opcao) => {
+                      const selecionada = respostaAtual === opcao.valor;
+                      return (
+                        <button
+                          key={opcao.valor}
+                          type="button"
+                          onClick={() => atualizarResposta(opcao.valor)}
+                          className={`w-full text-left rounded-2xl border px-5 py-4 transition-all ${
+                            selecionada
+                              ? "border-cyan-500/60 bg-cyan-500/10"
+                              : "border-white/10 bg-white/5 hover:bg-white/8 hover:border-white/20"
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div
+                              className={`w-4 h-4 rounded-full border-2 shrink-0 flex items-center justify-center ${
+                                selecionada ? "border-cyan-400" : "border-slate-600"
+                              }`}
+                            >
+                              {selecionada && <div className="w-2 h-2 rounded-full bg-cyan-400" />}
+                            </div>
+                            <span className={`text-[14.5px] ${selecionada ? "text-white" : "text-slate-300"}`}>
+                              {opcao.label}
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
+                ) : (
+                  <>
+                    <textarea
+                      key={perguntaAtual.chave}
+                      className="w-full rounded-2xl border border-white/10 bg-white/5 text-white placeholder-slate-500 text-[15px] leading-relaxed px-5 py-4 outline-none focus:border-cyan-500/50 focus:bg-white/8 transition-all resize-none"
+                      style={{ minHeight: 130 }}
+                      placeholder={perguntaAtual.placeholder}
+                      value={respostaAtual}
+                      onChange={(e) => atualizarResposta(e.target.value)}
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          irParaProxima();
+                        }
+                      }}
+                    />
+
+                    {/* Aviso leve (heurística), não bloqueia — só sugere */}
+                    {pareceTextoSuspeito(respostaAtual) && !validacaoAtual && (
+                      <div className="flex items-center gap-2 text-[12.5px] text-amber-400/90 px-1 -mt-2">
+                        <AlertTriangle size={13} className="shrink-0" />
+                        Isso não parece uma resposta válida — tenta escrever com suas palavras.
+                      </div>
+                    )}
+
+                    {/* Reprovação da IA — essa sim bloqueia o avanço */}
+                    {validacaoAtual && !validacaoAtual.aprovada && (
+                      <div className="rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2.5 -mt-2 space-y-2.5">
+                        <div className="flex items-center gap-2 text-[12.5px] text-red-300">
+                          <AlertTriangle size={13} className="shrink-0" />
+                          {validacaoAtual.mensagem || "Essa resposta precisa de mais detalhe antes de avançar."}
+                        </div>
+
+                        {validacaoAtual.sugestao && (
+                          <div className="rounded-lg border border-cyan-500/25 bg-cyan-500/5 p-3">
+                            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-cyan-400 uppercase tracking-wide mb-1.5">
+                              <Sparkles size={11} /> Sugestão da IA
+                            </div>
+                            <p className="text-[13px] text-slate-300 leading-relaxed mb-2">
+                              {validacaoAtual.sugestao}
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => atualizarResposta(validacaoAtual.sugestao!)}
+                              className="flex items-center gap-1.5 text-[12px] font-medium text-cyan-300 hover:text-cyan-200"
+                            >
+                              <Check size={12} /> Usar esta sugestão
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </>
                 )}
 
                 <div className="flex items-center justify-between gap-3">
@@ -819,10 +970,10 @@ export function ModuloAPage() {
 
                   <button
                     onClick={irParaProxima}
-                    disabled={!podeAvancar}
+                    disabled={!podeAvancar || validandoPasso}
                     className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl font-semibold text-[14px] transition-all"
                     style={
-                      podeAvancar
+                      podeAvancar && !validandoPasso
                         ? {
                             background: "linear-gradient(135deg, #06B6D4, #3B82F6)",
                             color: "white",
@@ -834,8 +985,20 @@ export function ModuloAPage() {
                           }
                     }
                   >
-                    {ehUltimaPergunta ? "Revisar respostas" : "Próxima"}
-                    <ArrowRight size={15} />
+                    {validandoPasso ? (
+                      <>
+                        <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                        Analisando...
+                      </>
+                    ) : (
+                      <>
+                        {ehUltimaPergunta ? "Revisar respostas" : "Próxima"}
+                        <ArrowRight size={15} />
+                      </>
+                    )}
                   </button>
                 </div>
 
@@ -1151,6 +1314,40 @@ export function ModuloAPage() {
                   ))}
                 </ul>
               )}
+
+              {/* Como chegar a 100% — ações concretas por campo fraco */}
+              {(projeto.sugestoesMelhoria ?? []).length > 0 && (
+                <div className="mt-3 pt-3 border-t border-white/10 space-y-2">
+                  <div className="flex items-center gap-1.5 text-[12px] font-semibold text-cyan-300 mb-1">
+                    <Sparkles size={12} /> Como chegar a 100%
+                  </div>
+                  {(projeto.sugestoesMelhoria ?? []).map((s, i) => {
+                    const podeAplicar = Boolean(s.sugestao) && CAMPOS_TEXTO_APLICAVEIS.has(s.campo);
+                    return (
+                      <div key={i} className="rounded-lg border border-white/10 bg-white/5 p-3">
+                        <p className="text-[12px] font-semibold text-white mb-1">{s.campoLabel}</p>
+                        <p className="text-[12px] text-slate-400 leading-relaxed mb-2">{s.mensagem}</p>
+                        {podeAplicar && (
+                          <>
+                            <div className="rounded-md border border-cyan-500/20 bg-cyan-500/5 p-2.5 mb-2">
+                              <p className="text-[12px] text-slate-300 leading-relaxed whitespace-pre-line line-clamp-4">
+                                {s.sugestao}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleSave(s.campo, s.sugestao!)}
+                              className="flex items-center gap-1.5 text-[12px] font-medium text-cyan-300 hover:text-cyan-200"
+                            >
+                              <Check size={12} /> Usar esta sugestão
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
 
@@ -1206,11 +1403,32 @@ export function ModuloAPage() {
 
           {/* Nome e Manifestação (editáveis) */}
           <div className="grid sm:grid-cols-2 gap-4">
-            <CampoEditavelTexto
-              label="Nome do Projeto"
-              valor={projeto.nome}
-              onSave={(v) => handleSave("nome", v)}
-            />
+            <div>
+              <CampoEditavelTexto
+                label="Nome do Projeto"
+                valor={projeto.nome}
+                onSave={(v) => handleSave("nome", v)}
+              />
+              {(projeto.sugestoesNome ?? []).length > 0 && (
+                <div className="mt-2 space-y-1.5">
+                  <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
+                    <Sparkles size={11} className="text-cyan-400" /> Sugestões de nome
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {(projeto.sugestoesNome ?? []).map((sugestao, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => handleSave("nome", sugestao)}
+                        className="text-[12px] px-2.5 py-1 rounded-full border border-cyan-500/25 bg-cyan-500/5 text-cyan-300 hover:bg-cyan-500/15 hover:border-cyan-500/40 transition-colors"
+                      >
+                        {sugestao}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
             <CampoEditavelSelect
               label="Manifestação Esportiva"
               valor={projeto.manifestacao}

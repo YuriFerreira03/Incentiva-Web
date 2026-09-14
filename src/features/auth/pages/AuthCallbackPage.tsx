@@ -9,7 +9,10 @@ export function AuthCallbackPage() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
-        navigate("/", { replace: true });
+        // Se a pessoa escreveu uma ideia na landing antes de logar, manda
+        // ela direto pro Módulo A — o ModuloAPage consome e limpa essa chave.
+        const temIdeiaPendente = sessionStorage.getItem("incentiva_ideia_pendente");
+        navigate(temIdeiaPendente ? "/modulo-a" : "/", { replace: true });
       } else {
         navigate("/login", { replace: true });
       }
