@@ -75,6 +75,26 @@ export type StatusProjeto =
 
 export type TelaModuloA = 'ideia' | 'gerando' | 'revisao' | 'enviando' | 'enviado'
 
+// ─── Oito dimensões avaliadas pela IA (especificação V4.1) ───────────────────
+export const DIMENSOES = [
+  'modalidadeEsportiva',
+  'manifestacaoEsportiva',
+  'publicoAlvo',
+  'localExecucao',
+  'quantidadeParticipantes',
+  'duracao',
+  'justificativa',
+  'formaExecucao',
+] as const
+export type Dimensao = (typeof DIMENSOES)[number]
+export type StatusDimensao = 'presente' | 'parcial' | 'ausente'
+
+export interface TopicoAnalise {
+  status: StatusDimensao
+  informacaoIdentificada: string
+  observacao: string
+}
+
 // ─── Pergunta do wizard: texto livre ou múltipla escolha (ex: manifestação) ──
 export interface OpcaoPergunta {
   valor: string
@@ -83,6 +103,7 @@ export interface OpcaoPergunta {
 
 export interface PerguntaWizard {
   chave: string
+  dimensao: Dimensao      // qual das 8 dimensões esta pergunta alimenta
   titulo: string
   helper: string
   tipo?: 'texto' | 'escolha'   // default: 'texto'
@@ -98,11 +119,20 @@ export interface PreAnalise {
   topicosFaltantes: string[]   // ex: ["local", "duração"]
   mensagem: string             // feedback curto e humano para o usuário
   ehTextoValido: boolean       // false = texto sem sentido / aleatório
+  // ── Novos (V4.1) — opcionais para manter compatibilidade com a interface atual
+  topicos?: Record<Dimensao, TopicoAnalise>
+  inconsistencias?: string[]
+  informacoesPendentes?: string[]
+  perguntasComplementares?: string[]
+  orientacaoUsuario?: string
 }
 
 // ─── Validação de uma única resposta do wizard (Fase 2) ──────────────────────
 export interface ValidacaoResposta {
   aprovada: boolean     // true = pode avançar para a próxima pergunta
   mensagem: string      // o que falta/corrigir (se reprovada) ou confirmação curta (se aprovada)
-  sugestao?: string     // versão melhorada da resposta, pronta para o usuário aceitar (se reprovada)
+  sugestao?: string     // reformulação dos fatos que o usuário já deu (nunca dados inventados)
+  status?: StatusDimensao        // presente | parcial | ausente
+  perguntaComplementar?: string  // pergunta objetiva para obter o dado que falta
+  inconsistencia?: string        // conflito com respostas anteriores (bloqueia a aprovação)
 }

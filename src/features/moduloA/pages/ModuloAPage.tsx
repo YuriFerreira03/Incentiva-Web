@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -22,7 +22,7 @@ import {
 import { useAuth } from "../../auth/hooks/useAuth";
 import { gerarProjeto, refazerProjeto, analisarIdeia, validarResposta } from "../services/moduloAService";
 import { gerarPDFProjeto } from "../services/pdfGerador";
-import type { ProjetoGerado, TelaModuloA, PreAnalise, Meta, ItemOrcamento, PerguntaWizard, ValidacaoResposta } from "../types/moduloA";
+import type { ProjetoGerado, TelaModuloA, PreAnalise, Meta, ItemOrcamento, PerguntaWizard, ValidacaoResposta, Dimensao } from "../types/moduloA";
 import { supabase } from "../../../lib/supabase";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -396,9 +396,13 @@ function SecaoRevisao({
 // A manifestação vem primeiro: define o enquadramento legal do projeto e
 // muda o que é possível estruturar depois (teto de captação, cota de rede
 // pública, etc.) — por isso é escolha fechada, não texto livre.
+// Resposta de interface (não é uma manifestação): conta como pendência e bloqueia a geração.
+const NAO_SEI_MANIFESTACAO = "Não sei ainda";
+
 const PERGUNTAS_WIZARD: PerguntaWizard[] = [
   {
     chave: "manifestacao",
+    dimensao: "manifestacaoEsportiva",
     titulo: "Qual é a manifestação esportiva do seu projeto?",
     helper: "Isso define as regras que se aplicam ao seu projeto perante a Lei de Incentivo ao Esporte.",
     tipo: "escolha",
@@ -415,10 +419,15 @@ const PERGUNTAS_WIZARD: PerguntaWizard[] = [
         valor: "Excelência Esportiva",
         label: "Excelência Esportiva — treinamento sistemático para alto rendimento e formação de atletas.",
       },
+      {
+        valor: NAO_SEI_MANIFESTACAO,
+        label: "Não sei ainda — prefiro decidir depois.",
+      },
     ],
   },
   {
     chave: "modalidade",
+    dimensao: "modalidadeEsportiva",
     titulo: "Qual é a modalidade esportiva do projeto?",
     helper: "O tipo de esporte que será praticado.",
     tipo: "texto",
@@ -426,6 +435,7 @@ const PERGUNTAS_WIZARD: PerguntaWizard[] = [
   },
   {
     chave: "público",
+    dimensao: "publicoAlvo",
     titulo: "Para qual público é o projeto?",
     helper: "Idade, perfil e situação social dos beneficiários.",
     tipo: "texto",
@@ -433,6 +443,7 @@ const PERGUNTAS_WIZARD: PerguntaWizard[] = [
   },
   {
     chave: "local",
+    dimensao: "localExecucao",
     titulo: "Onde o projeto será executado?",
     helper: "Cidade, bairro ou local específico.",
     tipo: "texto",
@@ -440,6 +451,7 @@ const PERGUNTAS_WIZARD: PerguntaWizard[] = [
   },
   {
     chave: "participantes",
+    dimensao: "quantidadeParticipantes",
     titulo: "Quantas pessoas serão atendidas?",
     helper: "Número estimado de beneficiários diretos.",
     tipo: "texto",
@@ -447,6 +459,7 @@ const PERGUNTAS_WIZARD: PerguntaWizard[] = [
   },
   {
     chave: "duração",
+    dimensao: "duracao",
     titulo: "Por quanto tempo o projeto vai durar?",
     helper: "Duração total e frequência das atividades.",
     tipo: "texto",
@@ -454,6 +467,7 @@ const PERGUNTAS_WIZARD: PerguntaWizard[] = [
   },
   {
     chave: "importância",
+    dimensao: "justificativa",
     titulo: "Por que esse projeto é importante?",
     helper: "O problema social ou esportivo que o projeto resolve.",
     tipo: "texto",
@@ -461,12 +475,20 @@ const PERGUNTAS_WIZARD: PerguntaWizard[] = [
   },
   {
     chave: "execução",
+    dimensao: "formaExecucao",
     titulo: "Como o projeto será executado?",
     helper: "Metodologia, equipe e parcerias envolvidas.",
     tipo: "texto",
     placeholder: "Ex: Aulas com professores de educação física, em parceria com o clube local",
   },
 ] as const;
+
+// Converte as respostas do wizard (chaves da tela) nas 8 dimensões da IA.
+function respostasPorDimensao(r: Record<string, string>): Partial<Record<Dimensao, string>> {
+  const saida: Partial<Record<Dimensao, string>> = {};
+  for (const p of PERGUNTAS_WIZARD) saida[p.dimensao] = (r[p.chave] ?? "").trim();
+  return saida;
+}
 
 // ─── Heurística leve: detecta texto sem sentido enquanto digita ─────────────
 // Não bloqueia nada — só avisa. A trava de verdade é a análise da IA no final.
@@ -532,6 +554,18 @@ export function ModuloAPage() {
   const [validandoPasso, setValidandoPasso] = useState(false);
   const [validacaoAtual, setValidacaoAtual] = useState<ValidacaoResposta | null>(null);
 
+  // ─── Ideia trazida da landing page (Fase 3) ──────────────────────────────
+  // Lê uma única vez ao montar e já limpa do sessionStorage, para não ser
+  // reaproveitada numa visita futura ou num refresh acidental.
+  const [ideiaLanding, setIdeiaLanding] = useState("");
+  useEffect(() => {
+    const pendente = sessionStorage.getItem("incentiva_ideia_pendente");
+    if (pendente) {
+      setIdeiaLanding(pendente);
+      sessionStorage.removeItem("incentiva_ideia_pendente");
+    }
+  }, []);
+
   // ─── Analisar e gerar ────────────────────────────────────────────────────
   // Um único botão: primeiro a IA pré-analisa; só gera se a ideia for suficiente.
   // Aceita um texto opcional (vindo do wizard); se ausente, usa o estado `ideia`.
@@ -543,7 +577,7 @@ export function ModuloAPage() {
     setAnalise(null);
     setAnalisando(true);
     try {
-      const pre = await analisarIdeia(texto);
+      const pre = await analisarIdeia(texto, respostasPorDimensao(respostas));
       setAnalise(pre);
       // Trava: só prossegue se o texto for válido E suficiente
       if (!pre.ehTextoValido || !pre.suficiente) {
@@ -564,8 +598,11 @@ export function ModuloAPage() {
   }
 
   // ─── Compõe o texto único a partir das respostas do wizard ───────────────
+  // Se a pessoa escreveu uma ideia livre na landing (Fase 3), ela entra como
+  // contexto adicional no início — a IA usa para enriquecer as respostas,
+  // sem tentar "quebrar" esse texto solto nos 7 campos individuais.
   function compilarIdeia(r: Record<string, string>): string {
-    return [
+    const base = [
       `Manifestação esportiva escolhida pelo proponente: ${r.manifestacao}.`,
       `Modalidade esportiva: ${r.modalidade}.`,
       `Público-alvo: ${r.público}.`,
@@ -574,7 +611,11 @@ export function ModuloAPage() {
       `Duração e frequência: ${r.duração}.`,
       `Importância do projeto: ${r.importância}.`,
       `Como será executado: ${r.execução}.`,
-    ].join(" ");
+    ];
+    if (ideiaLanding.trim()) {
+      base.unshift(`Contexto adicional fornecido pelo proponente (ideia inicial, em texto livre): "${ideiaLanding.trim()}".`);
+    }
+    return base.join(" ");
   }
 
   // ─── Botão do resumo: se já analisamos ao chegar aqui e está suficiente,
@@ -777,7 +818,12 @@ export function ModuloAPage() {
       setValidandoPasso(true);
       setValidacaoAtual(null);
       try {
-        const resultado = await validarResposta(perguntaAtual.titulo, respostaAtual, respostas);
+        const resultado = await validarResposta(
+          perguntaAtual.dimensao,
+          perguntaAtual.titulo,
+          respostaAtual,
+          respostasPorDimensao(respostas),
+        );
         setValidandoPasso(false);
         if (!resultado.aprovada) {
           setValidacaoAtual(resultado);
@@ -807,7 +853,7 @@ export function ModuloAPage() {
       setErro(null);
       setAnalisando(true);
       try {
-        const pre = await analisarIdeia(compilarIdeia(respostas));
+        const pre = await analisarIdeia(compilarIdeia(respostas), respostasPorDimensao(respostas));
         setAnalise(pre);
       } catch (e) {
         setErro(e instanceof Error ? e.message : "Erro ao analisar as respostas.");
@@ -832,6 +878,21 @@ export function ModuloAPage() {
         }}
       >
         <div className="flex-1 flex flex-col items-center justify-center px-6 py-12 max-w-2xl mx-auto w-full">
+          {/* Ideia trazida da landing page (Fase 3) — visível durante todo o wizard */}
+          {ideiaLanding.trim() && (
+            <div className="w-full mb-6 rounded-xl border border-cyan-500/20 bg-cyan-500/5 px-4 py-3">
+              <div className="flex items-center gap-1.5 text-[11px] font-semibold text-cyan-400 uppercase tracking-wide mb-1">
+                <Sparkles size={11} /> Você já escreveu isso
+              </div>
+              <p className="text-[12.5px] text-slate-300 leading-relaxed line-clamp-2">
+                {ideiaLanding}
+              </p>
+              <p className="text-[11px] text-slate-500 mt-1">
+                Vamos usar como contexto para te ajudar nas próximas respostas.
+              </p>
+            </div>
+          )}
+
           {!modoResumo ? (
             <>
               {/* Progresso */}
@@ -898,6 +959,12 @@ export function ModuloAPage() {
                         </button>
                       );
                     })}
+                    {perguntaAtual.chave === "manifestacao" && respostaAtual === NAO_SEI_MANIFESTACAO && (
+                      <div className="rounded-xl border border-amber-500/25 bg-amber-500/5 px-4 py-3 text-[12.5px] text-amber-200/90">
+                        Sem problema. Você pode seguir, mas o rascunho só poderá ser gerado depois que você
+                        escolher uma das três manifestações — dá para voltar e escolher no resumo.
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <>
@@ -933,10 +1000,21 @@ export function ModuloAPage() {
                           {validacaoAtual.mensagem || "Essa resposta precisa de mais detalhe antes de avançar."}
                         </div>
 
+                        {validacaoAtual.inconsistencia && (
+                          <div className="text-[12px] text-red-200/90 pl-5">
+                            Conflito com o que você respondeu antes: {validacaoAtual.inconsistencia}
+                          </div>
+                        )}
+                        {validacaoAtual.perguntaComplementar && (
+                          <div className="text-[12.5px] text-slate-200 pl-5">
+                            {validacaoAtual.perguntaComplementar}
+                          </div>
+                        )}
+
                         {validacaoAtual.sugestao && (
                           <div className="rounded-lg border border-cyan-500/25 bg-cyan-500/5 p-3">
                             <div className="flex items-center gap-1.5 text-[11px] font-semibold text-cyan-400 uppercase tracking-wide mb-1.5">
-                              <Sparkles size={11} /> Sugestão da IA
+                              <Sparkles size={11} /> Sugestão de reescrita
                             </div>
                             <p className="text-[13px] text-slate-300 leading-relaxed mb-2">
                               {validacaoAtual.sugestao}
@@ -1104,6 +1182,15 @@ export function ModuloAPage() {
                       >
                         {analise.mensagem}
                       </p>
+                      {analise.ehTextoValido && (analise.perguntasComplementares ?? []).length > 0 && (
+                        <ul className="mt-2 space-y-1">
+                          {(analise.perguntasComplementares ?? []).map((q, i) => (
+                            <li key={i} className="text-[12.5px] text-amber-100/80">
+                              • {q}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                       {analise.ehTextoValido && analise.topicosFaltantes.length > 0 && (
                         <div className="mt-2 flex flex-wrap gap-1.5">
                           {analise.topicosFaltantes.map((t) => (
