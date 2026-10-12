@@ -8,6 +8,9 @@
   "functions": {
     "api/ai.js": {
       "maxDuration": 60
+    },
+    "api/matching-explicar.js": {
+      "maxDuration": 60
     }
   }
 }

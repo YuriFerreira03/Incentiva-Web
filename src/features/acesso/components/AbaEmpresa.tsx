@@ -74,7 +74,7 @@ export function AbaEmpresa() {
       <div>
         <h2 className="text-[15px] font-semibold text-white mb-1">Preferências de apoio</h2>
         <p className="text-[12.5px] text-slate-500 mb-5">
-          Serão usadas no matching por IA (em breve). Deixe em branco o que não faz diferença.
+          Usadas para calcular quais projetos mais combinam com a sua empresa. Deixe em branco o que não faz diferença.
         </p>
         <PreferenciasCampos valor={valor} onChange={setValor} />
       </div>

@@ -7,8 +7,8 @@
 //   AI_MODEL       (opcional; padrão openai/gpt-oss-120b)
 //   + as do Supabase que já existem (VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY)
 //
-// Só responde a usuários logados: o navegador envia o token do Supabase e a
-// função confere com o Supabase antes de gastar qualquer cota da Groq.
+// Só responde a usuários logados COM PERFIL DE PROPONENTE: o navegador envia o token do Supabase e a
+// função confere usuário e papel antes de gastar qualquer cota da Groq.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
@@ -39,6 +39,19 @@ export default async function handler(req, res) {
     if (!r.ok) return res.status(401).json({ error: 'unauthorized' })
   } catch {
     return res.status(502).json({ error: 'auth_unavailable' })
+  }
+
+  // 1b) Papel: este endpoint é do Módulo A, então só proponente. A leitura usa o token do próprio
+  //     usuário (a regra de acesso do banco só devolve os papéis dele), sem chave service_role.
+  try {
+    const rp = await fetch(`${supabaseUrl}/rest/v1/perfis_acesso?select=papel&papel=eq.proponente&limit=1`, {
+      headers: { apikey: supabaseAnon, Authorization: `Bearer ${token}` },
+    })
+    if (!rp.ok) return res.status(502).json({ error: 'perfil_indisponivel' })
+    const papeis = await rp.json()
+    if (!Array.isArray(papeis) || papeis.length === 0) return res.status(403).json({ error: 'forbidden' })
+  } catch {
+    return res.status(502).json({ error: 'perfil_indisponivel' })
   }
 
   // 2) Entrada: só aceita system/user/temperature. Modelo e formato são fixos

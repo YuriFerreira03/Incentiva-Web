@@ -28,7 +28,7 @@ function Bloco({ titulo, dica, children }: { titulo: string; dica?: string; chil
 }
 
 // Usado no cadastro da empresa (passo 3) e na aba "Minha empresa" do perfil.
-// Estas preferências alimentam o matching por IA (em breve). Tudo é opcional: vazio = vale para todos.
+// Estas preferências alimentam o matching ("Mais combinam" na vitrine). Tudo é opcional: vazio = vale para todos.
 export function PreferenciasCampos({ valor, onChange }: Props) {
   const mudar = <K extends keyof PreferenciasForm>(chave: K, v: PreferenciasForm[K]) =>
     onChange({ ...valor, [chave]: v });

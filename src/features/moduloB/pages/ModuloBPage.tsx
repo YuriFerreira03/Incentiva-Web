@@ -5,6 +5,7 @@ import { PainelFiltros } from "../components/PainelFiltros";
 import { ProjetoCard } from "../components/ProjetoCard";
 import { ProjetoDetalhe } from "../components/ProjetoDetalhe";
 import { usePerfil } from "../../acesso/hooks/usePerfil";
+import { useMatching } from "../hooks/useMatching";
 import { useVitrine } from "../hooks/useVitrine";
 import type { ProjetoAutorizado } from "../types/projetoAutorizado";
 import { formatarData } from "../utils/formatadores";
@@ -20,13 +21,25 @@ function Indicador({ rotulo, valor }: { rotulo: string; valor: string }) {
 
 export function ModuloBPage() {
   const v = useVitrine();
+  const m = useMatching();
   const { empresa, preferencias } = usePerfil();
+  const [modo, setModo] = useState<"todos" | "match">("todos");
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
   const [aberto, setAberto] = useState<ProjetoAutorizado | null>(null);
 
   const fechar = useCallback(() => setAberto(null), []);
 
   const semResultado = !v.carregando && !v.erro && v.total === 0;
+  const podeCombinar = Boolean(empresa && preferencias);
+
+  function abrirMatch() {
+    setModo("match");
+    void m.iniciar();
+  }
+  function voltarTodos() {
+    setModo("todos");
+    m.desativar();
+  }
 
   return (
     <div className="flex-1 max-w-6xl mx-auto w-full px-6 py-10">
@@ -56,12 +69,12 @@ export function ModuloBPage() {
         </p>
       </div>
 
-      {/* Empresa sem preferências: a vitrine funciona, mas o matching (em breve) precisa delas */}
+      {/* Empresa sem preferências: a vitrine funciona, mas o matching ("Mais combinam") precisa delas */}
       {empresa && !preferencias && (
         <div className="rounded-xl border border-amber-500/25 bg-amber-500/5 px-4 py-3 mb-6 flex items-start gap-2.5">
           <Info size={15} className="text-amber-400 mt-0.5 shrink-0" />
           <p className="text-[12.5px] text-amber-200">
-            Complete as preferências da sua empresa para o matching por IA, que chega em breve.{" "}
+            Complete as preferências da sua empresa para ver os projetos que mais combinam com ela.{" "}
             <Link to="/perfil?tab=empresa" className="underline hover:text-amber-100">
               Completar agora
             </Link>
@@ -79,7 +92,90 @@ export function ModuloBPage() {
         </div>
       )}
 
+      {/* Alternância: todos os projetos x os que mais combinam */}
+      <div className="flex flex-wrap items-center gap-2 mb-6">
+        <div className="inline-flex p-1 rounded-xl bg-white/5 border border-white/10">
+          <button
+            type="button"
+            onClick={voltarTodos}
+            className={`px-4 py-2 rounded-lg text-[13px] font-medium transition-all ${
+              modo === "todos" ? "bg-white/10 text-white" : "text-slate-400 hover:text-white"
+            }`}
+          >
+            Todos os projetos
+          </button>
+          <button
+            type="button"
+            onClick={abrirMatch}
+            disabled={!podeCombinar}
+            title={podeCombinar ? undefined : "Preencha as preferências da sua empresa para usar"}
+            className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-[13px] font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
+              modo === "match" ? "bg-cyan-500/20 text-cyan-200" : "text-slate-400 hover:text-white"
+            }`}
+          >
+            <Sparkles size={13} /> Mais combinam com minha empresa
+          </button>
+        </div>
+      </div>
+
+      {modo === "match" && (
+        <div className="mb-6">
+          <div className="rounded-xl border border-cyan-400/20 bg-cyan-400/5 px-4 py-3 mb-5 flex flex-wrap items-center justify-between gap-3">
+            <p className="text-[12.5px] text-slate-300 max-w-3xl">
+              Os 100 projetos que mais combinam com as preferências da sua empresa. A nota (0 a 100) é calculada por
+              regras fixas; a explicação em texto é escrita por IA, só com os dados do projeto.
+            </p>
+            <button
+              type="button"
+              onClick={() => void m.iniciar()}
+              disabled={m.etapa === "calculando"}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-[12.5px] text-cyan-200 border border-cyan-400/30 hover:bg-cyan-400/10 disabled:opacity-50"
+            >
+              <RefreshCw size={13} /> Recalcular
+            </button>
+          </div>
+
+          {m.etapa === "calculando" && (
+            <div className="flex items-center justify-center py-24">
+              <div className="w-8 h-8 rounded-full border-2 border-cyan-400/30 border-t-cyan-400 animate-spin" />
+            </div>
+          )}
+
+          {m.etapa === "erro" && (
+            <div className="rounded-xl bg-red-500/10 border border-red-500/30 px-4 py-3 text-sm text-red-300">
+              {m.erro}
+              {m.erro?.toLowerCase().includes("preferência") && (
+                <>
+                  {" "}
+                  <Link to="/perfil?tab=empresa" className="underline">
+                    Preencher agora
+                  </Link>
+                </>
+              )}
+            </div>
+          )}
+
+          {m.etapa === "pronto" && m.resultados.length === 0 && (
+            <p className="text-slate-400 text-sm py-10 text-center">Nenhum projeto com prazo aberto combinou com as suas preferências.</p>
+          )}
+
+          {m.etapa === "pronto" && m.resultados.length > 0 && (
+            <>
+              <p className="text-[12.5px] text-slate-500 mb-3">
+                {m.resultados.length.toLocaleString("pt-BR")} projetos, do que mais combina para o que menos combina
+              </p>
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {m.resultados.map((p) => (
+                  <ProjetoCard key={p.id} projeto={p} onAbrir={setAberto} gerandoExplicacao={m.explicando} />
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
       {/* Busca e filtros */}
+      {modo === "todos" && (
       <div className="space-y-3 mb-6">
         <div className="flex gap-2">
           <div className="flex-1 relative">
@@ -124,21 +220,22 @@ export function ModuloBPage() {
           />
         )}
       </div>
+      )}
 
       {/* Estados da lista */}
-      {v.erro && (
+      {modo === "todos" && v.erro && (
         <div className="rounded-xl bg-red-500/10 border border-red-500/30 px-4 py-3 text-sm text-red-300 mb-4">
           Erro ao carregar projetos: {v.erro}
         </div>
       )}
 
-      {v.carregando && (
+      {modo === "todos" && v.carregando && (
         <div className="flex items-center justify-center py-24">
           <div className="w-8 h-8 rounded-full border-2 border-cyan-400/30 border-t-cyan-400 animate-spin" />
         </div>
       )}
 
-      {!v.carregando && semResultado && (
+      {modo === "todos" && !v.carregando && semResultado && (
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mb-5">
             <FileText className="text-slate-600" size={28} />
@@ -165,7 +262,7 @@ export function ModuloBPage() {
         </div>
       )}
 
-      {!v.carregando && v.projetos.length > 0 && (
+      {modo === "todos" && !v.carregando && v.projetos.length > 0 && (
         <>
           <p className="text-[12.5px] text-slate-500 mb-3">
             Exibindo {v.projetos.length.toLocaleString("pt-BR")} de {v.total.toLocaleString("pt-BR")} projetos
@@ -197,12 +294,12 @@ export function ModuloBPage() {
           <p className="text-[13px] text-slate-300 font-medium mb-1">Próximas etapas</p>
           <p className="text-[12.5px] text-slate-500">
             Resumo, metas e orçamento de cada projeto, preenchidos pelo próprio proponente, e contato direto pela
-            plataforma. Depois, o matching por IA entre o perfil do incentivador e os projetos.
+            plataforma.
           </p>
         </div>
       </div>
 
-      {aberto && <ProjetoDetalhe projeto={aberto} onFechar={fechar} />}
+      {aberto && <ProjetoDetalhe projeto={aberto} onFechar={fechar} gerandoExplicacao={m.explicando} />}
     </div>
   );
 }

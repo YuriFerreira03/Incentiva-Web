@@ -574,13 +574,12 @@ export function LandingPage() {
             <ModuleCard
               tone="accent"
               chip="Módulo B"
-              chipIa="IA em breve"
               title="Vitrine de projetos autorizados"
               subtitle="Encontre projetos esportivos já autorizados pelo Ministério do Esporte e com prazo de captação aberto."
               bullets={[
                 "Projetos autorizados pelo Ministério do Esporte, com prazo de captação aberto.",
                 "Filtros por estado, modalidade, valor e prazo.",
-                "Matching por IA com o perfil da sua empresa (em breve).",
+                "Matching por IA: os projetos que mais combinam com o perfil da sua empresa, com nota e explicação.",
               ]}
               icon={<Radar size={20} />}
               cta="Explorar a vitrine"

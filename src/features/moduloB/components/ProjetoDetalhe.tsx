@@ -4,6 +4,7 @@ import { Building2, X } from "lucide-react";
 import type { ProjetoAutorizado } from "../types/projetoAutorizado";
 import { formatarData, formatarMoeda, montarLocal } from "../utils/formatadores";
 import { BarraCaptacao } from "./BarraCaptacao";
+import { ExplicacaoIA, FatoresTabela, NotaBadge, faixaDaNota } from "./MatchingResumo";
 import { SeloPrazo, SeloStatus } from "./Selos";
 
 interface Props {
@@ -11,6 +12,8 @@ interface Props {
   onFechar: () => void;
   // Espaço para ações futuras (ex.: botão "Tenho interesse"). Hoje a página não passa nada.
   acoes?: ReactNode;
+  /** true enquanto a IA ainda escreve a explicação (só no modo "Mais combinam") */
+  gerandoExplicacao?: boolean;
 }
 
 function Fato({ rotulo, valor, mono = false }: { rotulo: string; valor: string | null | undefined; mono?: boolean }) {
@@ -24,7 +27,7 @@ function Fato({ rotulo, valor, mono = false }: { rotulo: string; valor: string |
   );
 }
 
-export function ProjetoDetalhe({ projeto: p, onFechar, acoes }: Props) {
+export function ProjetoDetalhe({ projeto: p, onFechar, acoes, gerandoExplicacao }: Props) {
   const botaoFechar = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -91,6 +94,26 @@ export function ProjetoDetalhe({ projeto: p, onFechar, acoes }: Props) {
         <div className="mt-4">
           <BarraCaptacao captado={p.valor_captado} percentual={p.percentual_captado} />
         </div>
+
+        {p.fatores && p.nota !== undefined && (
+          <section className="mt-6 space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-[12px] font-semibold text-slate-300 uppercase tracking-wider">
+                Por que combina com a sua empresa
+              </h3>
+              <div className="flex items-center gap-2">
+                <span className="text-[12px] text-slate-400">{faixaDaNota(p.nota).rotulo}</span>
+                <NotaBadge nota={p.nota} />
+              </div>
+            </div>
+            <ExplicacaoIA texto={p.explicacao} carregando={gerandoExplicacao} />
+            <FatoresTabela fatores={p.fatores} />
+            <p className="text-[11px] text-slate-600">
+              A nota de 0 a 100 é calculada por regras fixas, com os pesos indicados, só sobre o que a sua empresa
+              preencheu. Modalidade e temas podem ser estimados pelo nome do projeto quando a planilha não informa.
+            </p>
+          </section>
+        )}
 
         <section className="mt-6">
           <h3 className="text-[12px] font-semibold text-slate-300 uppercase tracking-wider mb-2">Sobre o projeto</h3>

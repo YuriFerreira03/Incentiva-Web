@@ -2,16 +2,19 @@ import { Building2, MapPin } from "lucide-react";
 import type { ProjetoAutorizado } from "../types/projetoAutorizado";
 import { formatarData, formatarMoeda, montarLocal } from "../utils/formatadores";
 import { BarraCaptacao } from "./BarraCaptacao";
+import { ExplicacaoIA, FatoresChips, NotaBadge } from "./MatchingResumo";
 import { SeloPrazo, SeloStatus } from "./Selos";
 
 interface Props {
   projeto: ProjetoAutorizado;
   onAbrir: (projeto: ProjetoAutorizado) => void;
+  /** true enquanto a IA ainda escreve as explicações do top 10 (só no modo "Mais combinam") */
+  gerandoExplicacao?: boolean;
 }
 
 const ETIQUETA = "text-[11px] px-2 py-0.5 rounded-full bg-white/8 text-slate-300";
 
-export function ProjetoCard({ projeto: p, onAbrir }: Props) {
+export function ProjetoCard({ projeto: p, onAbrir, gerandoExplicacao }: Props) {
   const local = montarLocal(p.cidade, p.uf);
 
   return (
@@ -27,9 +30,12 @@ export function ProjetoCard({ projeto: p, onAbrir }: Props) {
       }}
       className="flex flex-col rounded-2xl border border-white/10 bg-white/5 hover:bg-white/[0.07] transition-colors p-5 cursor-pointer outline-none focus-visible:border-cyan-500/60"
     >
-      <div className="flex flex-wrap gap-1.5 mb-3">
-        <SeloStatus status={p.status ?? "autorizado"} />
-        <SeloPrazo dias={p.dias_para_vencer} />
+      <div className="flex items-start justify-between gap-2 mb-3">
+        <div className="flex flex-wrap gap-1.5">
+          <SeloStatus status={p.status ?? "autorizado"} />
+          <SeloPrazo dias={p.dias_para_vencer} />
+        </div>
+        {p.nota !== undefined && <NotaBadge nota={p.nota} />}
       </div>
 
       <h3 className="text-white font-semibold text-[15px] leading-snug line-clamp-2">{p.projeto}</h3>
@@ -47,6 +53,17 @@ export function ProjetoCard({ projeto: p, onAbrir }: Props) {
           </span>
         )}
       </div>
+
+      {p.fatores && (
+        <div className="mt-3">
+          <FatoresChips fatores={p.fatores} />
+        </div>
+      )}
+      {p.fatores && (p.explicacao || (gerandoExplicacao && (p.posicao ?? 99) <= 10)) && (
+        <div className="mt-3">
+          <ExplicacaoIA texto={p.explicacao} carregando={gerandoExplicacao} />
+        </div>
+      )}
 
       {p.resumo && <p className="text-[12.5px] text-slate-400 mt-3 line-clamp-2">{p.resumo}</p>}
 

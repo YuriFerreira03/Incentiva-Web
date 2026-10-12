@@ -36,7 +36,7 @@ const OPCOES: Opcao[] = [
     itens: [
       "Vitrine de projetos com prazo de captação aberto.",
       "Filtros por estado, modalidade, valor e prazo.",
-      "Matching por IA com o perfil da empresa (em breve).",
+      "Matching por IA: os projetos que mais combinam com o perfil da empresa.",
     ],
     destino: "/cadastro/empresa",
   },

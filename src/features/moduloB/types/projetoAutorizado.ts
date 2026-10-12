@@ -5,6 +5,17 @@ export type StatusProjeto = "autorizado" | "em_pauta";
 
 export type Ordenacao = "recentes" | "prazo_asc" | "valor_desc" | "valor_asc";
 
+export type StatusFator = "combina" | "parcial" | "nao_combina" | "desconhecido" | "sem_preferencia";
+
+// Um fator da nota do matching (calculado no banco). "pontos" vai de 0 a 100; null = a empresa não preencheu.
+export interface FatorMatching {
+  fator: string;
+  peso: number;
+  pontos: number | null;
+  status: StatusFator;
+  detalhe: string | null;
+}
+
 export interface ProjetoAutorizado {
   id: string;
   processo: string;
@@ -28,6 +39,12 @@ export interface ProjetoAutorizado {
   resumo?: string | null; // preenchido pelo proponente (Módulo A)
   valor_captado?: number | null;
   percentual_captado?: number | null;
+
+  // ── Matching: só preenchidos quando o projeto vem da view vw_matching
+  nota?: number;
+  posicao?: number;
+  fatores?: FatorMatching[];
+  explicacao?: string | null;
 }
 
 export interface Filtros {
