@@ -62,7 +62,7 @@ export function AppFooter() {
             Incentiva
           </span>
         </div>
-        <div>© 2026 INCENTIVA · Lei de Incentivo ao Esporte nº 11.438/2006</div>
+        <div>© 2026 INCENTIVA · Lei de Incentivo ao Esporte</div>
       </div>
     </footer>
   );

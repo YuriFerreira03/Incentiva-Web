@@ -23,23 +23,23 @@ export function RegisterPage() {
           </div>
 
           <h1 className="text-4xl font-bold text-white leading-tight">
-            Estruture seu projeto{" "}
-            <span className="text-cyan-400">com inteligência.</span>
+            Crie sua conta e{" "}
+            <span className="text-cyan-400">escolha seu perfil.</span>
           </h1>
 
           <p className="text-gray-400 text-lg leading-relaxed max-w-md">
-            Crie sua conta e transforme sua ideia em um projeto esportivo
-            estruturado, pronto para captação de recursos.
+            Proponentes estruturam projetos esportivos com apoio de IA. Empresas
+            incentivadoras encontram projetos autorizados para apoiar.
           </p>
         </div>
 
         {/* Benefícios */}
         <div className="space-y-4">
           {[
-            "IA copiloto em toda a jornada",
-            "Validação técnica preliminar automática",
-            "Matching inteligente com incentivadores",
-            "Acompanhamento até o recurso depositado",
+            "Proponente: IA que ajuda a estruturar o projeto",
+            "Proponente: preparação para o cadastro no SLI",
+            "Empresa: vitrine de projetos autorizados com prazo aberto",
+            "Empresa: filtros por estado, modalidade, valor e prazo",
           ].map((item) => (
             <div key={item} className="flex items-center gap-3">
               <div

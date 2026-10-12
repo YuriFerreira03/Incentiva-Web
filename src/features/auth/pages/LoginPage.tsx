@@ -35,16 +35,15 @@ export function LoginPage() {
           </p>
         </div>
 
-        {/* Estatísticas */}
-        <div className="grid grid-cols-3 gap-6">
+        {/* Dois perfis */}
+        <div className="grid grid-cols-2 gap-6">
           {[
-            { value: "R$ 420 Mi+", label: "em projetos apoiados" },
-            { value: "1.820", label: "projetos estruturados" },
-            { value: "94%", label: "de aderência média" },
-          ].map((stat) => (
-            <div key={stat.label} className="space-y-1">
-              <div className="text-2xl font-bold text-white">{stat.value}</div>
-              <div className="text-xs text-gray-500">{stat.label}</div>
+            { titulo: "Proponentes", texto: "Estruturam o projeto com apoio de IA." },
+            { titulo: "Empresas incentivadoras", texto: "Encontram projetos autorizados para apoiar." },
+          ].map((p) => (
+            <div key={p.titulo} className="space-y-1">
+              <div className="text-sm font-semibold text-white">{p.titulo}</div>
+              <div className="text-xs text-gray-500">{p.texto}</div>
             </div>
           ))}
         </div>

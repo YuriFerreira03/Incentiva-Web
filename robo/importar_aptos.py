@@ -80,28 +80,30 @@ def valor(v):
 
 
 def cnpj_dv_ok(d):
-    n = [int(x) for x in d]
+    """Módulo 11 da Receita. Valor do caractere = código ASCII - 48 (vale para dígitos e, desde 31/07/2026, letras)."""
+    vals = [ord(ch) - 48 for ch in d]
     for k, pesos in (
         (12, [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]),
         (13, [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]),
     ):
-        r = sum(a * b for a, b in zip(n[:k], pesos)) % 11
-        if n[k] != (0 if r < 2 else 11 - r):
+        r = sum(a * b for a, b in zip(vals[:k], pesos)) % 11
+        if vals[k] != (0 if r < 2 else 11 - r):
             return False
     return True
 
 
 def cnpj(v):
-    """Retorna (cnpj_formatado_ou_None, flags)."""
+    """Retorna (cnpj_formatado_ou_None, flags). Aceita CNPJ numérico e alfanumérico."""
     s = txt(v)
     if not s:
         return None, ["cnpj_invalido"]
-    d = re.sub(r"\D", "", s)
+    s = re.sub(r"^[A-Za-z]{1,4}\s*:\s*", "", s)  # rótulo digitado junto ("J: 04.162...")
+    d = re.sub(r"[^0-9A-Za-z]", "", s).upper()
     flags = []
-    if len(d) == 13:
+    if len(d) == 13 and d.isdigit():  # zero à esquerda perdido
         d = d.zfill(14)
         flags.append("cnpj_corrigido")
-    if len(d) == 14 and cnpj_dv_ok(d):
+    if re.fullmatch(r"[0-9A-Z]{12}[0-9]{2}", d) and not re.fullmatch(r"(\d)\1{13}", d) and cnpj_dv_ok(d):
         return f"{d[:2]}.{d[2:5]}.{d[5:8]}/{d[8:12]}-{d[12:]}", flags
     return None, ["cnpj_invalido"]
 

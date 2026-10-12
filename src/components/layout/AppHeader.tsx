@@ -8,13 +8,19 @@ import {
   Rocket,
   Settings,
   Menu,
+  Building2,
+  Radar,
 } from "lucide-react";
 import { useAuth } from "../../features/auth/hooks/useAuth";
+import { usePerfil } from "../../features/acesso/hooks/usePerfil";
 
 export function AppHeader() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, signOut } = useAuth();
+  const { temPapel } = usePerfil();
+  const ehProponente = temPapel("proponente");
+  const ehIncentivador = temPapel("incentivador");
   const [menuAberto, setMenuAberto] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -119,9 +125,13 @@ export function AppHeader() {
         <nav className="hidden md:flex items-center gap-1">
           {[
             { label: "Plataforma", path: "/" },
-            { label: "Módulo A", path: "/modulo-a" },
-            { label: "Módulo B", path: "/modulo-b" },
-            { label: "Meus projetos", path: "/meus-projetos" },
+            ...(ehProponente
+              ? [
+                  { label: "Módulo A", path: "/modulo-a" },
+                  { label: "Meus projetos", path: "/meus-projetos" },
+                ]
+              : []),
+            ...(ehIncentivador ? [{ label: "Vitrine de projetos", path: "/modulo-b" }] : []),
           ].map((item) => (
             <button
               key={item.path}
@@ -236,26 +246,55 @@ export function AppHeader() {
 
                   {/* Itens do menu */}
                   <div className="py-1.5">
-                    <MenuSection label="Projetos" />
-                    <MenuItem
-                      icon={<Rocket size={15} />}
-                      label="Módulo A — Novo projeto"
-                      onClick={() => navigate("/modulo-a")}
-                      highlight
-                    />
-                    <MenuItem
-                      icon={<FolderOpen size={15} />}
-                      label="Meus projetos"
-                      onClick={() => navigate("/meus-projetos")}
-                    />
-
-                    <div className="my-1.5 border-t border-white/8" />
+                    {ehProponente && (
+                      <>
+                        <MenuSection label="Projetos" />
+                        <MenuItem
+                          icon={<Rocket size={15} />}
+                          label="Módulo A — Novo projeto"
+                          onClick={() => navigate("/modulo-a")}
+                          highlight
+                        />
+                        <MenuItem
+                          icon={<FolderOpen size={15} />}
+                          label="Meus projetos"
+                          onClick={() => navigate("/meus-projetos")}
+                        />
+                        <div className="my-1.5 border-t border-white/8" />
+                      </>
+                    )}
+                    {ehIncentivador && (
+                      <>
+                        <MenuSection label="Incentivador" />
+                        <MenuItem
+                          icon={<Radar size={15} />}
+                          label="Vitrine de projetos"
+                          onClick={() => navigate("/modulo-b")}
+                          highlight
+                        />
+                        <div className="my-1.5 border-t border-white/8" />
+                      </>
+                    )}
                     <MenuSection label="Conta" />
                     <MenuItem
                       icon={<User size={15} />}
                       label="Meu perfil"
                       onClick={() => navigate("/perfil")}
                     />
+                    {ehIncentivador && (
+                      <MenuItem
+                        icon={<Building2 size={15} />}
+                        label="Minha empresa"
+                        onClick={() => navigate("/perfil?tab=empresa")}
+                      />
+                    )}
+                    {ehProponente && (
+                      <MenuItem
+                        icon={<Building2 size={15} />}
+                        label="Minha entidade"
+                        onClick={() => navigate("/perfil?tab=entidade")}
+                      />
+                    )}
                     <MenuItem
                       icon={<Settings size={15} />}
                       label="Configurações"

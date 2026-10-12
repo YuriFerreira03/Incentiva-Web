@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate } from "react-router-dom";
@@ -10,6 +11,7 @@ export function RegisterForm() {
   const { signUpWithEmail, signInWithGoogle, loading, error, clearError } =
     useAuth();
   const navigate = useNavigate();
+  const [emailEnviadoPara, setEmailEnviadoPara] = useState<string | null>(null);
 
   const {
     register,
@@ -20,14 +22,27 @@ export function RegisterForm() {
   });
 
   const onSubmit = async (data: RegisterFormData) => {
-    await signUpWithEmail(data.email, data.password, data.name);
-    if (!error) navigate("/");
+    const resultado = await signUpWithEmail(data.email, data.password, data.name);
+    if (resultado === "ok") navigate("/app", { replace: true });
+    if (resultado === "confirmar_email") setEmailEnviadoPara(data.email);
   };
 
   const handleGoogle = async () => {
     clearError();
     await signInWithGoogle();
   };
+
+  if (emailEnviadoPara) {
+    return (
+      <div className="rounded-xl border border-cyan-400/25 bg-cyan-400/5 p-5 space-y-2 text-center">
+        <h3 className="text-base font-semibold text-white">Confirme seu e-mail</h3>
+        <p className="text-sm text-gray-400">
+          Enviamos um link para <span className="text-gray-200">{emailEnviadoPara}</span>. Clique nele para ativar a
+          conta e escolher como vai usar o INCENTIVA.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-5">

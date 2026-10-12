@@ -21,6 +21,8 @@ import {
   Shield,
 } from "lucide-react";
 import { useAuth } from "../../auth/hooks/useAuth";
+import { usePerfil } from "../../acesso/hooks/usePerfil";
+import { definirPerfilPretendido } from "../../acesso/intencao";
 
 // ---------- Design tokens ----------
 const C = {
@@ -243,9 +245,11 @@ function ModuleCard({
   icon,
   cta,
   onCta,
+  chipIa,
 }: {
   tone: "blue" | "accent";
   chip: string;
+  chipIa?: string;
   title: string;
   subtitle: string;
   bullets: string[];
@@ -262,7 +266,7 @@ function ModuleCard({
       />
       <div className="relative flex items-center gap-2 mb-3">
         <Chip tone={tone === "blue" ? "blue" : "accent"}>{chip}</Chip>
-        <AiChip />
+        <AiChip>{chipIa}</AiChip>
       </div>
       <div className="relative flex items-start gap-4">
         <div
@@ -325,7 +329,7 @@ function MiniAiShowcase() {
           </div>
           <div className="text-[12.5px] text-slate-300">Copiloto IA</div>
           <span className="ml-auto text-[10.5px] text-slate-500 tracking-widest uppercase">
-            ao vivo
+            exemplo ilustrativo
           </span>
         </div>
         <div className="space-y-2.5">
@@ -377,7 +381,17 @@ function MiniAiShowcase() {
 export function LandingPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { papeis, temPapel, carregando: carregandoPerfil } = usePerfil();
   const [ideiaLanding, setIdeiaLanding] = useState("");
+  // Conta só de empresa não submete projeto: a caixa da ideia não faz sentido para ela.
+  // Enquanto o perfil de quem já entrou carrega, a caixa fica escondida (evita aparecer e sumir).
+  const soEmpresa = papeis.length > 0 && !temPapel("proponente");
+  const mostrarIdeia = user ? !carregandoPerfil && !soEmpresa : true;
+
+  function comecarComoIncentivador() {
+    definirPerfilPretendido("incentivador");
+    navigate("/register");
+  }
 
   // Guarda a ideia temporariamente e manda para o cadastro/login (se precisar)
   // ou direto para o Módulo A (se já estiver logado). O ModuloAPage lê e
@@ -385,7 +399,7 @@ export function LandingPage() {
   function handleComecarComIdeia() {
     if (!ideiaLanding.trim()) return;
     sessionStorage.setItem("incentiva_ideia_pendente", ideiaLanding.trim());
-    navigate(user ? "/modulo-a" : "/register");
+    navigate(user ? "/app" : "/register");
   }
 
   return (
@@ -442,9 +456,9 @@ export function LandingPage() {
                       size="lg"
                       icon={<Rocket size={16} />}
                       iconRight={<ArrowRight size={16} />}
-                      onClick={() => navigate("/dashboard")}
+                      onClick={() => navigate("/app")}
                     >
-                      Ir para o dashboard
+                      Ir para a plataforma
                     </Button>
                   ) : (
                     <>
@@ -468,7 +482,7 @@ export function LandingPage() {
                         size="lg"
                         variant="ghost"
                         icon={<Building2 size={16} />}
-                        onClick={() => navigate("/login")}
+                        onClick={comecarComoIncentivador}
                       >
                         Sou incentivador
                       </Button>
@@ -476,7 +490,8 @@ export function LandingPage() {
                   )}
                 </div>
 
-                {/* Caixa de texto: escreva a ideia antes mesmo de logar */}
+                {/* Caixa de texto: escreva a ideia antes mesmo de logar (some para conta só de empresa) */}
+                {mostrarIdeia && (
                 <div
                   className="mt-8 rounded-2xl glass p-5 max-w-[820px] fade-up fade-up-3"
                   style={{ boxShadow: "0 0 0 1px rgba(148,163,184,0.12) inset" }}
@@ -508,29 +523,7 @@ export function LandingPage() {
                     </Button>
                   </div>
                 </div>
-
-                <div className="mt-10 grid grid-cols-3 gap-5 max-w-[820px] fade-up fade-up-4">
-                  {[
-                    { k: "R$ 420 Mi+", v: "em projetos apoiados" },
-                    { k: "1.820", v: "projetos estruturados" },
-                    { k: "94%", v: "de aderência média" },
-                  ].map((s) => (
-                    <div
-                      key={s.k}
-                      className="rounded-xl p-4 glass"
-                      style={{
-                        boxShadow: "0 0 0 1px rgba(148,163,184,0.12) inset",
-                      }}
-                    >
-                      <div className="font-display text-2xl text-white font-semibold">
-                        {s.k}
-                      </div>
-                      <div className="text-[12px] text-slate-400 mt-1">
-                        {s.v}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                )}
               </div>
             </div>
           </div>
@@ -570,22 +563,31 @@ export function LandingPage() {
               ]}
               icon={<Lightbulb size={20} />}
               cta="Explorar Módulo A"
-              onCta={() => navigate(user ? "/modulo-a" : "/register")}
+              onCta={() => {
+                if (user) navigate("/modulo-a");
+                else {
+                  definirPerfilPretendido("proponente");
+                  navigate("/register");
+                }
+              }}
             />
             <ModuleCard
               tone="accent"
               chip="Módulo B"
-              title="Captação Inteligente"
-              subtitle="Do projeto aprovado ao recurso depositado."
+              chipIa="IA em breve"
+              title="Vitrine de projetos autorizados"
+              subtitle="Encontre projetos esportivos já autorizados pelo Ministério do Esporte e com prazo de captação aberto."
               bullets={[
-                "IA analisa perfis de projeto e de incentivador e gera matching explicável.",
-                "Score de aderência com fatores de compatibilidade visíveis.",
-                "Experiência para o incentivador escolher, decidir e apoiar.",
-                "Aporte simulado com comprovante, recibo e confirmação.",
+                "Projetos autorizados pelo Ministério do Esporte, com prazo de captação aberto.",
+                "Filtros por estado, modalidade, valor e prazo.",
+                "Matching por IA com o perfil da sua empresa (em breve).",
               ]}
               icon={<Radar size={20} />}
-              cta="Explorar Módulo B"
-              onCta={() => navigate(user ? "/dashboard" : "/register")}
+              cta="Explorar a vitrine"
+              onCta={() => {
+                if (user) navigate("/modulo-b");
+                else comecarComoIncentivador();
+              }}
             />
           </div>
         </section>

@@ -4,13 +4,17 @@ import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase";
 import type { AuthState, User } from "../types/auth";
 
+export type ResultadoCadastro = "ok" | "confirmar_email" | "erro";
+
 interface AuthContextValue extends AuthState {
-  signInWithEmail: (email: string, password: string) => Promise<void>;
+  /** true quando entrou; em caso de erro, a mensagem fica em `error` */
+  signInWithEmail: (email: string, password: string) => Promise<boolean>;
+  /** "confirmar_email" = conta criada, mas o Supabase exige clicar no link enviado por e-mail */
   signUpWithEmail: (
     email: string,
     password: string,
     name: string,
-  ) => Promise<void>;
+  ) => Promise<ResultadoCadastro>;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
   clearError: () => void;
@@ -70,21 +74,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email,
       password,
     });
-    if (error) setError(error.message);
+    if (error) {
+      setError(error.message);
+      return false;
+    }
+    return true;
   };
 
   const signUpWithEmail = async (
     email: string,
     password: string,
     name: string,
-  ) => {
+  ): Promise<ResultadoCadastro> => {
     clearError();
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { full_name: name } },
+      options: {
+        data: { full_name: name },
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
+      },
     });
-    if (error) setError(error.message);
+    if (error) {
+      setError(error.message);
+      return "erro";
+    }
+    // Sem sessão = confirmação de e-mail ligada no Supabase
+    return data.session ? "ok" : "confirmar_email";
   };
 
   const signInWithGoogle = async () => {

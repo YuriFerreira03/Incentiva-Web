@@ -7,11 +7,19 @@ import {
   AlertTriangle,
   Eye,
   EyeOff,
+  Building2,
 } from "lucide-react";
 import { supabase } from "../../../lib/supabase";
 import { useAuth } from "../../auth/hooks/useAuth";
+import { usePerfil } from "../../acesso/hooks/usePerfil";
+import { AbaEmpresa } from "../../acesso/components/AbaEmpresa";
+import { AbaEntidade } from "../../acesso/components/AbaEntidade";
 
-type Tab = "perfil" | "seguranca";
+type Tab = "perfil" | "seguranca" | "empresa" | "entidade";
+
+function tabInicial(valor: string | null): Tab {
+  return valor === "seguranca" || valor === "empresa" || valor === "entidade" ? valor : "perfil";
+}
 
 function Field({
   label,
@@ -38,10 +46,20 @@ const inputClass = `
 
 export function PerfilPage() {
   const { user } = useAuth();
+  const { temPapel } = usePerfil();
   const [searchParams] = useSearchParams();
-  const [tab, setTab] = useState<Tab>(
-    searchParams.get("tab") === "seguranca" ? "seguranca" : "perfil",
-  );
+  const [tab, setTab] = useState<Tab>(tabInicial(searchParams.get("tab")));
+
+  const abas: { key: Tab; label: string; icon: React.ReactNode }[] = [
+    { key: "perfil", label: "Dados pessoais", icon: <User size={14} /> },
+    ...(temPapel("incentivador")
+      ? [{ key: "empresa" as const, label: "Minha empresa", icon: <Building2 size={14} /> }]
+      : []),
+    ...(temPapel("proponente")
+      ? [{ key: "entidade" as const, label: "Minha entidade", icon: <Building2 size={14} /> }]
+      : []),
+    { key: "seguranca", label: "Segurança", icon: <Lock size={14} /> },
+  ];
 
   // ─── Estado Perfil ──────────────────────────────────────────────────────
   const [nome, setNome] = useState(user?.name ?? "");
@@ -150,16 +168,7 @@ export function PerfilPage() {
 
       {/* Tabs */}
       <div className="flex gap-1 mb-6 p-1 rounded-xl bg-white/5 border border-white/8 w-fit">
-        {(
-          [
-            {
-              key: "perfil",
-              label: "Dados pessoais",
-              icon: <User size={14} />,
-            },
-            { key: "seguranca", label: "Segurança", icon: <Lock size={14} /> },
-          ] as { key: Tab; label: string; icon: React.ReactNode }[]
-        ).map((t) => (
+        {abas.map((t) => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
@@ -173,6 +182,9 @@ export function PerfilPage() {
           </button>
         ))}
       </div>
+
+      {tab === "empresa" && <AbaEmpresa />}
+      {tab === "entidade" && <AbaEntidade />}
 
       {/* ── TAB: Perfil ── */}
       {tab === "perfil" && (

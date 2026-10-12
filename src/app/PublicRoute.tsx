@@ -6,5 +6,5 @@ export function PublicRoute() {
 
   if (loading) return null;
 
-  return user ? <Navigate to="/" replace /> : <Outlet />;
+  return user ? <Navigate to="/app" replace /> : <Outlet />;
 }

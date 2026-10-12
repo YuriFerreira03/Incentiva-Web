@@ -1,8 +1,10 @@
 import { useCallback, useState } from "react";
+import { Link } from "react-router-dom";
 import { FileText, Info, RefreshCw, Search, SlidersHorizontal, Sparkles } from "lucide-react";
 import { PainelFiltros } from "../components/PainelFiltros";
 import { ProjetoCard } from "../components/ProjetoCard";
 import { ProjetoDetalhe } from "../components/ProjetoDetalhe";
+import { usePerfil } from "../../acesso/hooks/usePerfil";
 import { useVitrine } from "../hooks/useVitrine";
 import type { ProjetoAutorizado } from "../types/projetoAutorizado";
 import { formatarData } from "../utils/formatadores";
@@ -18,6 +20,7 @@ function Indicador({ rotulo, valor }: { rotulo: string; valor: string }) {
 
 export function ModuloBPage() {
   const v = useVitrine();
+  const { empresa, preferencias } = usePerfil();
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
   const [aberto, setAberto] = useState<ProjetoAutorizado | null>(null);
 
@@ -52,6 +55,19 @@ export function ModuloBPage() {
           . A lista traz o valor autorizado e o prazo, mas não o quanto já foi captado.
         </p>
       </div>
+
+      {/* Empresa sem preferências: a vitrine funciona, mas o matching (em breve) precisa delas */}
+      {empresa && !preferencias && (
+        <div className="rounded-xl border border-amber-500/25 bg-amber-500/5 px-4 py-3 mb-6 flex items-start gap-2.5">
+          <Info size={15} className="text-amber-400 mt-0.5 shrink-0" />
+          <p className="text-[12.5px] text-amber-200">
+            Complete as preferências da sua empresa para o matching por IA, que chega em breve.{" "}
+            <Link to="/perfil?tab=empresa" className="underline hover:text-amber-100">
+              Completar agora
+            </Link>
+          </p>
+        </div>
+      )}
 
       {/* Indicadores */}
       {v.estatisticas && (

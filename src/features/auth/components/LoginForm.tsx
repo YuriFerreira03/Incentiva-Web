@@ -20,8 +20,8 @@ export function LoginForm() {
   });
 
   const onSubmit = async (data: LoginFormData) => {
-    await signInWithEmail(data.email, data.password);
-    if (!error) navigate("/");
+    const entrou = await signInWithEmail(data.email, data.password);
+    if (entrou) navigate("/app", { replace: true });
   };
 
   const handleGoogle = async () => {
