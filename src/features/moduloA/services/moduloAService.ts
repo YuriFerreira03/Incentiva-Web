@@ -34,6 +34,7 @@ function extrairJSON(raw: string): unknown {
   const s = text.indexOf('{')
   const e = text.lastIndexOf('}')
   if (s !== -1 && e > s) text = text.slice(s, e + 1)
+  text = text.replace(/,\s*([}\]])/g, '$1')
   return JSON.parse(text)
 }
 
