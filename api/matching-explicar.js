@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Explicação do matching por IA (Vercel Function).
+// Explicação do matching por IA (Vercel Function) — Claude Haiku 5.5.
 //
 // O que faz: para os 10 primeiros projetos do ranking da empresa logada que ainda não têm
 // explicação, pede à IA um texto curto de "por que combina" e grava no banco.
@@ -12,10 +12,11 @@
 //    Todo número citado no texto é conferido contra os fatos; se não bater, o texto é descartado.
 //  - Só gera para quem ainda não tem explicação; repetir a chamada não gasta IA.
 //
-// Variáveis na Vercel: GROQ_API_KEY (obrigatória), AI_MODEL (opcional) + as do Supabase que já existem.
+// Variáveis na Vercel: ANTHROPIC_API_KEY (obrigatória) + as do Supabase que já existem.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
+import { chamarClaude, MODELO } from './_anthropic.js'
+
 const VERSAO_PROMPT = 'expl-v1'
 const MAX_ITENS = 10
 const TEXTO_MIN = 20
@@ -61,7 +62,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'method_not_allowed' })
   }
 
-  const apiKey = process.env.GROQ_API_KEY
+  const apiKey = process.env.ANTHROPIC_API_KEY
   const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
   const supabaseAnon = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY
   if (!apiKey || !supabaseUrl || !supabaseAnon) return res.status(500).json({ error: 'server_not_configured' })
@@ -129,22 +130,14 @@ export default async function handler(req, res) {
   // 5) IA
   let conteudo
   try {
-    const r = await fetch(GROQ_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({
-        model: process.env.AI_MODEL || 'openai/gpt-oss-120b',
-        messages: [
-          { role: 'system', content: SYSTEM },
-          { role: 'user', content: JSON.stringify({ perfil_da_empresa: prefs, projetos: fatos }) },
-        ],
-        response_format: { type: 'json_object' },
-        temperature: 0.2,
-      }),
+    conteudo = await chamarClaude({
+      system: SYSTEM,
+      user: JSON.stringify({ perfil_da_empresa: prefs, projetos: fatos }),
+      temperature: 0.2,
+      maxTokens: 2000,
     })
-    if (!r.ok) return res.status(r.status === 429 ? 429 : 502).json({ error: 'upstream_error' })
-    conteudo = (await r.json())?.choices?.[0]?.message?.content ?? ''
-  } catch {
+  } catch (e) {
+    if (e.status) return res.status(e.status === 429 ? 429 : 502).json({ error: 'upstream_error' })
     return res.status(502).json({ error: 'upstream_unreachable' })
   }
 
@@ -177,7 +170,7 @@ export default async function handler(req, res) {
   if (validos.length === 0) return res.status(200).json({ itens: [], geradas: 0, descartadas: descartados })
 
   // 7) Grava (com o token do usuário; o banco confere que as linhas são da empresa dele)
-  const modelo = process.env.AI_MODEL || 'openai/gpt-oss-120b'
+  const modelo = MODELO
   let salvo = false
   try {
     const r = await fetch(`${supabaseUrl}/rest/v1/rpc/salvar_explicacoes`, {

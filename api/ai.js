@@ -1,17 +1,17 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Proxy seguro para a IA (Vercel Function).
-// A chave da Groq fica SÓ aqui (variável sem prefixo VITE_), nunca no navegador.
+// Proxy seguro para a IA (Vercel Function) — Claude Haiku 5.5.
+// A chave da Anthropic fica SÓ aqui (variável sem prefixo VITE_), nunca no navegador.
 //
 // Variáveis no painel da Vercel (Settings → Environment Variables):
-//   GROQ_API_KEY   (obrigatória, tipo Secret)
-//   AI_MODEL       (opcional; padrão openai/gpt-oss-120b)
+//   ANTHROPIC_API_KEY (obrigatória, tipo Secret)
 //   + as do Supabase que já existem (VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY)
 //
 // Só responde a usuários logados COM PERFIL DE PROPONENTE: o navegador envia o token do Supabase e a
-// função confere usuário e papel antes de gastar qualquer cota da Groq.
+// função confere usuário e papel antes de gastar qualquer cota da IA.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
+import { chamarClaude } from './_anthropic.js'
+
 const MAX_SYSTEM = 30000
 const MAX_USER = 60000
 
@@ -21,7 +21,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'method_not_allowed' })
   }
 
-  const apiKey = process.env.GROQ_API_KEY
+  const apiKey = process.env.ANTHROPIC_API_KEY
   const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
   const supabaseAnon = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY
   if (!apiKey || !supabaseUrl || !supabaseAnon) {
@@ -54,8 +54,7 @@ export default async function handler(req, res) {
     return res.status(502).json({ error: 'perfil_indisponivel' })
   }
 
-  // 2) Entrada: só aceita system/user/temperature. Modelo e formato são fixos
-  //    no servidor, então o cliente não consegue pedir outro modelo.
+  // 2) Entrada: só aceita system/user/temperature. Modelo é fixo no servidor.
   let body = req.body
   if (typeof body === 'string') {
     try {
@@ -73,28 +72,12 @@ export default async function handler(req, res) {
   }
   const temp = typeof temperature === 'number' ? Math.min(1, Math.max(0, temperature)) : 0.3
 
-  // 3) Chamada à Groq
+  // 3) Chamada ao Claude Haiku 5.5 (8000 é teto; cobra só o que for gerado)
   try {
-    const r = await fetch(GROQ_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({
-        model: process.env.AI_MODEL || 'openai/gpt-oss-120b',
-        messages: [
-          { role: 'system', content: system },
-          { role: 'user', content: user },
-        ],
-        response_format: { type: 'json_object' },
-        temperature: temp,
-      }),
-    })
-    if (!r.ok) {
-      // não repassa o corpo do erro (pode conter detalhes da conta)
-      return res.status(r.status === 429 ? 429 : 502).json({ error: 'upstream_error', status: r.status })
-    }
-    const data = await r.json()
-    return res.status(200).json({ content: data?.choices?.[0]?.message?.content ?? '' })
-  } catch {
+    const content = await chamarClaude({ system, user, temperature: temp, maxTokens: 8000 })
+    return res.status(200).json({ content })
+  } catch (e) {
+    if (e.status) return res.status(e.status === 429 ? 429 : 502).json({ error: 'upstream_error', status: e.status })
     return res.status(502).json({ error: 'upstream_unreachable' })
   }
 }
