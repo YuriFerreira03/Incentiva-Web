@@ -12,33 +12,9 @@ import {
 type RespostasPorDimensao = Partial<Record<Dimensao, string>>
 
 // ─── Acesso à IA ─────────────────────────────────────────────────────────────
-// PRODUÇÃO: o navegador chama /api/ai (função da Vercel), que guarda a chave.
-// DESENVOLVIMENTO LOCAL: se existir VITE_AI_API_KEY no .env local, chama a Groq
-// direto. Esse trecho não vai para o build de produção (import.meta.env.DEV é
-// false lá). NUNCA configure VITE_AI_API_KEY na Vercel.
-const DEV_KEY: string | undefined = import.meta.env.DEV ? import.meta.env.VITE_AI_API_KEY : undefined
-const DEV_MODEL: string = import.meta.env.VITE_AI_MODEL || 'openai/gpt-oss-120b'
+// O navegador sempre chama /api/ai (Vercel Function), que guarda a chave da Anthropic.
 
 async function chamarIA(system: string, user: string, temperature = 0.3): Promise<string> {
-  if (DEV_KEY) {
-    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${DEV_KEY}` },
-      body: JSON.stringify({
-        model: DEV_MODEL,
-        messages: [
-          { role: 'system', content: system },
-          { role: 'user', content: user },
-        ],
-        response_format: { type: 'json_object' },
-        temperature,
-      }),
-    })
-    if (!res.ok) throw new Error(`IA indisponível (${res.status})`)
-    const d = await res.json()
-    return d.choices?.[0]?.message?.content || ''
-  }
-
   const { data } = await supabase.auth.getSession()
   const token = data.session?.access_token
   if (!token) throw new Error('Sessão expirada. Entre novamente.')
