@@ -128,9 +128,14 @@ Aceite implícitos somente se inequívocos; jamais invente dados.
 Não confunda modalidade com manifestação. Registre a declaração do
 proponente; diante de dúvida ou conflito, solicite esclarecimento.
 Não infira manifestação pela idade ou existência de competição.
-suficiente=true somente se texto válido, 8 status presentes e sem
-contradições bloqueantes. Aponte pendências e formule até 8 perguntas
-objetivas, preferencialmente uma por dimensão pendente.
+suficiente=true quando o texto for válido e as 8 dimensões estiverem
+presentes, mesmo que existam detalhes a aprimorar. Contradição
+bloqueante é apenas conflito que impede entender o projeto (ex.:
+público adulto com manifestação Formação Esportiva). Documentação,
+comprovações, termos formais, parcerias assinadas e dados estatísticos
+NÃO bloqueiam: registre-os em informacoesPendentes como recomendações
+para a etapa de elaboração. Formule no máximo 3 perguntas, somente
+sobre o que realmente impede a geração.
 Retorne exclusivamente JSON válido em pt-BR, sem campos extras/null.`
 
 export async function analisarIdeia(ideia: string, respostas: RespostasPorDimensao = {}): Promise<PreAnalise> {
