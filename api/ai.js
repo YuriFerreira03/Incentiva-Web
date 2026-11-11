@@ -12,6 +12,8 @@
 
 import { chamarClaude } from './_anthropic.js'
 
+export const config = { maxDuration: 120 }
+
 const MAX_SYSTEM = 30000
 const MAX_USER = 60000
 
@@ -74,7 +76,7 @@ export default async function handler(req, res) {
 
   // 3) Chamada ao Claude Haiku 5.5 (8000 é teto; cobra só o que for gerado)
   try {
-    const content = await chamarClaude({ system, user, temperature: temp, maxTokens: 8000 })
+    const content = await chamarClaude({ system, user, temperature: temp, maxTokens: 16000 })
     return res.status(200).json({ content })
   } catch (e) {
     if (e.status) return res.status(e.status === 429 ? 429 : 502).json({ error: 'upstream_error', status: e.status, detalhe: e.detalhe })
