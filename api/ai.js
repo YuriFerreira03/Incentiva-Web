@@ -12,7 +12,7 @@
 
 import { chamarClaude } from './_anthropic.js'
 
-export const config = { maxDuration: 120 }
+export const config = { maxDuration: 300 }
 
 const MAX_SYSTEM = 30000
 const MAX_USER = 60000

@@ -1,16 +1,16 @@
 {
-  "rewrites": [
-    {
-      "source": "/((?!api/).*)",
-      "destination": "/index.html"
-    }
-  ],
-  "functions": {
-    "api/ai.js": {
-      "maxDuration": 60
-    },
-    "api/matching-explicar.js": {
-      "maxDuration": 60
-    }
-  }
+    "rewrites":  [
+                     {
+                         "source":  "/((?!api/).*)",
+                         "destination":  "/index.html"
+                     }
+                 ],
+    "functions":  {
+                      "api/matching-explicar.js":  {
+                                                       "maxDuration":  60
+                                                   },
+                      "api/ai.js":  {
+                                        "maxDuration":  300
+                                    }
+                  }
 }
