@@ -175,7 +175,11 @@ sem avaliar. Não crie informações não fornecidas.`
 
   try {
     const ia = await chamarIAJson(PREANALISE_SYSTEM, prompt, PreAnaliseIASchema, 0.2)
-    return consolidarPreAnalise(ia)
+    const r = consolidarPreAnalise(ia)
+    // Suficiência decidida no código: 8 dimensões presentes liberam a geração.
+    // Pendências da IA viram recomendações, não bloqueio.
+    r.suficiente = r.ehTextoValido !== false && r.topicosFaltantes.length === 0
+    return r
   } catch (e) {
     console.error('analisarIdeia: IA indisponível ou resposta inválida', e)
     // Sem checagem equivalente, o fallback NUNCA declara suficiência.
