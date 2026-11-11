@@ -77,7 +77,7 @@ export default async function handler(req, res) {
     const content = await chamarClaude({ system, user, temperature: temp, maxTokens: 8000 })
     return res.status(200).json({ content })
   } catch (e) {
-    if (e.status) return res.status(e.status === 429 ? 429 : 502).json({ error: 'upstream_error', status: e.status })
+    if (e.status) return res.status(e.status === 429 ? 429 : 502).json({ error: 'upstream_error', status: e.status, detalhe: e.detalhe })
     return res.status(502).json({ error: 'upstream_unreachable' })
   }
 }

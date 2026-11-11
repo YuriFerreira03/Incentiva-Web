@@ -25,9 +25,12 @@ export async function chamarClaude({ system, user, temperature = 0.3, maxTokens 
     }),
   })
   if (!r.ok) {
-    console.error('Anthropic', r.status, await r.text())
+    const detalhe = await r.text()
+    console.error('Anthropic', r.status, detalhe)
     const err = new Error('upstream_error')
     err.status = r.status
+    err.detalhe = detalhe
+    err.detalhe = detalhe
     throw err
   }
   const data = await r.json()
