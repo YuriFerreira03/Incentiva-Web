@@ -10,6 +10,7 @@ const FERRAMENTA = {
   input_schema: { type: 'object', additionalProperties: true },
 }
 
+// Retorna { texto, uso: { input_tokens, output_tokens } }
 export async function chamarClaude({ system, user, maxTokens = 2048 }) {
   const r = await fetch(ANTHROPIC_URL, {
     method: 'POST',
@@ -21,28 +22,34 @@ export async function chamarClaude({ system, user, maxTokens = 2048 }) {
     body: JSON.stringify({
       model: MODELO,
       max_tokens: maxTokens,
-      system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
+      system,
       messages: [{ role: 'user', content: user }],
       tools: [FERRAMENTA],
       tool_choice: { type: 'tool', name: 'responder' },
     }),
   })
   if (!r.ok) {
-    const detalhe = await r.text()
-    console.error('Anthropic', r.status, detalhe)
+    // O detalhe vai só para o log da Vercel, nunca para o navegador.
+    console.error('Anthropic', r.status, await r.text())
     const err = new Error('upstream_error')
     err.status = r.status
-    err.detalhe = detalhe
     throw err
   }
   const data = await r.json()
+  const uso = {
+    input_tokens: data?.usage?.input_tokens ?? 0,
+    output_tokens: data?.usage?.output_tokens ?? 0,
+  }
   if (data.stop_reason === 'max_tokens') {
-    console.error('Anthropic: resposta cortada por max_tokens')
+    console.error('Anthropic: resposta cortada por max_tokens', uso)
     const err = new Error('resposta_cortada')
     err.status = 413
+    err.uso = uso
     throw err
   }
   const bloco = (data.content || []).find((b) => b.type === 'tool_use')
-  if (bloco && bloco.input) return JSON.stringify(bloco.input)
-  return (data.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('')
+  const texto = bloco && bloco.input
+    ? JSON.stringify(bloco.input)
+    : (data.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('')
+  return { texto, uso }
 }

@@ -4,6 +4,7 @@
 //
 // Variáveis no painel da Vercel (Settings → Environment Variables):
 //   ANTHROPIC_API_KEY (obrigatória, tipo Secret)
+//   IA_COTA_DIARIA    (opcional; padrão 60 chamadas por usuário a cada 24h)
 //   + as do Supabase que já existem (VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY)
 //
 // Só responde a usuários logados COM PERFIL DE PROPONENTE: o navegador envia o token do Supabase e a
@@ -16,6 +17,44 @@ export const config = { maxDuration: 300 }
 
 const MAX_SYSTEM = 30000
 const MAX_USER = 60000
+
+// Teto de tokens de saída por tipo de chamada (custo máximo previsível).
+const TETO_SAIDA = {
+  validacao: 600,
+  preanalise: 2000,
+  gerar: 16000,
+  refazer: 12000,
+  melhorar: 1500,
+}
+const COTA_DIARIA = Number(process.env.IA_COTA_DIARIA || 60)
+
+// Conta as chamadas do usuário nas últimas 24h (tabela ia_uso, com RLS por usuário).
+// Se a tabela ainda não existir, não bloqueia.
+async function chamadasUltimas24h(supabaseUrl, cab) {
+  const desde = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+  try {
+    const r = await fetch(`${supabaseUrl}/rest/v1/ia_uso?select=id&created_at=gte.${desde}&limit=1`, {
+      headers: { ...cab, Prefer: 'count=exact' },
+    })
+    if (!r.ok) return 0
+    const total = Number((r.headers.get('content-range') || '').split('/')[1])
+    return Number.isFinite(total) ? total : 0
+  } catch {
+    return 0
+  }
+}
+
+async function registrarUso(supabaseUrl, cab, tipo, uso) {
+  try {
+    await fetch(`${supabaseUrl}/rest/v1/ia_uso`, {
+      method: 'POST',
+      headers: { ...cab, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify({ rota: 'ai', tipo, input_tokens: uso.input_tokens, output_tokens: uso.output_tokens }),
+    })
+  } catch {
+    /* registro é best-effort */
+  }
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -56,7 +95,7 @@ export default async function handler(req, res) {
     return res.status(502).json({ error: 'perfil_indisponivel' })
   }
 
-  // 2) Entrada: só aceita system/user/temperature. Modelo é fixo no servidor.
+  // 2) Entrada: só aceita system/user/tipo. Modelo e tetos são fixos no servidor.
   let body = req.body
   if (typeof body === 'string') {
     try {
@@ -65,21 +104,29 @@ export default async function handler(req, res) {
       body = null
     }
   }
-  const { system, user, temperature } = body || {}
+  const { system, user, tipo } = body || {}
   if (
     typeof system !== 'string' || typeof user !== 'string' ||
     !system || !user || system.length > MAX_SYSTEM || user.length > MAX_USER
   ) {
     return res.status(400).json({ error: 'invalid_request' })
   }
-  const temp = typeof temperature === 'number' ? Math.min(1, Math.max(0, temperature)) : 0.3
+  const tipoOk = Object.prototype.hasOwnProperty.call(TETO_SAIDA, tipo) ? tipo : 'preanalise'
+  const cab = { apikey: supabaseAnon, Authorization: `Bearer ${token}` }
 
-  // 3) Chamada ao Claude Haiku 5.5 (8000 é teto; cobra só o que for gerado)
+  // 2b) Cota diária por usuário
+  if ((await chamadasUltimas24h(supabaseUrl, cab)) >= COTA_DIARIA) {
+    return res.status(429).json({ error: 'cota_diaria' })
+  }
+
+  // 3) Chamada ao Claude Haiku 5.5
   try {
-    const content = await chamarClaude({ system, user, temperature: temp, maxTokens: 16000 })
-    return res.status(200).json({ content })
+    const { texto, uso } = await chamarClaude({ system, user, maxTokens: TETO_SAIDA[tipoOk] })
+    await registrarUso(supabaseUrl, cab, tipoOk, uso)
+    return res.status(200).json({ content: texto })
   } catch (e) {
-    if (e.status) return res.status(e.status === 429 ? 429 : 502).json({ error: 'upstream_error', status: e.status, detalhe: e.detalhe })
+    if (e.uso) await registrarUso(supabaseUrl, cab, tipoOk, e.uso)
+    if (e.status) return res.status(e.status === 429 ? 429 : 502).json({ error: 'upstream_error', status: e.status })
     return res.status(502).json({ error: 'upstream_unreachable' })
   }
 }

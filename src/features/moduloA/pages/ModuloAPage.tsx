@@ -20,7 +20,7 @@ import {
   FileDown,
 } from "lucide-react";
 import { useAuth } from "../../auth/hooks/useAuth";
-import { gerarProjeto, refazerProjeto, analisarIdeia, validarResposta } from "../services/moduloAService";
+import { gerarProjeto, refazerProjeto, analisarIdeia, validarResposta, melhorarCampo } from "../services/moduloAService";
 import { gerarPDFProjeto } from "../services/pdfGerador";
 import type { ProjetoGerado, TelaModuloA, PreAnalise, Meta, ItemOrcamento, PerguntaWizard, ValidacaoResposta, Dimensao } from "../types/moduloA";
 import { supabase } from "../../../lib/supabase";
@@ -535,6 +535,7 @@ export function ModuloAPage() {
   const [mostraMaisContexto, setMostraMaisContexto] = useState(false);
   const [analisando, setAnalisando] = useState(false);
   const [analise, setAnalise] = useState<PreAnalise | null>(null);
+  const [gerandoSugestao, setGerandoSugestao] = useState<number | null>(null);
 
   // ─── Wizard de perguntas (chatbot passo a passo) ─────────────────────────
   const [passo, setPasso] = useState(0);
@@ -651,6 +652,27 @@ export function ModuloAPage() {
       setTela("revisao");
     } catch {
       setTela("revisao");
+    }
+  }
+
+  // ─── Texto sugerido sob demanda (só quando o usuário pede) ───────────────
+  async function handlePedirSugestao(indice: number) {
+    if (!projeto || gerandoSugestao !== null) return;
+    const s = projeto.sugestoesMelhoria[indice];
+    if (!s) return;
+    setGerandoSugestao(indice);
+    try {
+      const texto = await melhorarCampo(s.campo, s.mensagem, projeto);
+      setProjeto((prev) => {
+        if (!prev) return prev;
+        const lista = [...prev.sugestoesMelhoria];
+        lista[indice] = { ...lista[indice], sugestao: texto };
+        return { ...prev, sugestoesMelhoria: lista };
+      });
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : "Não foi possível gerar a sugestão.");
+    } finally {
+      setGerandoSugestao(null);
     }
   }
 
@@ -1409,11 +1431,22 @@ export function ModuloAPage() {
                     <Sparkles size={12} /> Como chegar a 100%
                   </div>
                   {(projeto.sugestoesMelhoria ?? []).map((s, i) => {
-                    const podeAplicar = Boolean(s.sugestao) && CAMPOS_TEXTO_APLICAVEIS.has(s.campo);
+                    const campoDeTexto = CAMPOS_TEXTO_APLICAVEIS.has(s.campo);
+                    const podeAplicar = Boolean(s.sugestao) && campoDeTexto;
                     return (
                       <div key={i} className="rounded-lg border border-white/10 bg-white/5 p-3">
                         <p className="text-[12px] font-semibold text-white mb-1">{s.campoLabel}</p>
                         <p className="text-[12px] text-slate-400 leading-relaxed mb-2">{s.mensagem}</p>
+                        {campoDeTexto && !s.sugestao && (
+                          <button
+                            type="button"
+                            onClick={() => handlePedirSugestao(i)}
+                            disabled={gerandoSugestao !== null}
+                            className="flex items-center gap-1.5 text-[12px] font-medium text-cyan-300 hover:text-cyan-200 disabled:opacity-50"
+                          >
+                            <Sparkles size={12} /> {gerandoSugestao === i ? "Gerando texto..." : "Gerar texto sugerido"}
+                          </button>
+                        )}
                         {podeAplicar && (
                           <>
                             <div className="rounded-md border border-cyan-500/20 bg-cyan-500/5 p-2.5 mb-2">

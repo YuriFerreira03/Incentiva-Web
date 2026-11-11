@@ -229,6 +229,12 @@ export const ProjetoGeradoSchema = z.object({
   sugestoesNome: lista(texto),
 })
 
+// Refazer: a IA devolve só os campos que mudaram (os demais ficam como estão).
+export const ProjetoParcialSchema = ProjetoGeradoSchema.partial()
+
+// Texto sugerido sob demanda para um único campo.
+export const MelhoriaCampoIASchema = z.object({ sugestao: texto })
+
 /** Valida e normaliza o JSON bruto da IA no formato que a tela espera. */
 export function normalizarProjeto(bruto: unknown): ProjetoGerado {
   return ProjetoGeradoSchema.parse(bruto)

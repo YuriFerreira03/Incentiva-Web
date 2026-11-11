@@ -130,12 +130,12 @@ export default async function handler(req, res) {
   // 5) IA
   let conteudo
   try {
-    conteudo = await chamarClaude({
+    ;({ texto: conteudo } = await chamarClaude({
       system: SYSTEM,
       user: JSON.stringify({ perfil_da_empresa: prefs, projetos: fatos }),
       temperature: 0.2,
       maxTokens: 2000,
-    })
+    }))
   } catch (e) {
     if (e.status) return res.status(e.status === 429 ? 429 : 502).json({ error: 'upstream_error' })
     return res.status(502).json({ error: 'upstream_unreachable' })
