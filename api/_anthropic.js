@@ -20,14 +20,17 @@ export async function chamarClaude({ system, user, temperature = 0.3, maxTokens 
     body: JSON.stringify({
       model: MODELO,
       max_tokens: maxTokens,
-      temperature,
       system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
       messages: [{ role: 'user', content: user }],
     }),
   })
   if (!r.ok) {
+    const detalhe = await r.text()
+    console.error('Anthropic', r.status, detalhe)
     const err = new Error('upstream_error')
     err.status = r.status
+    err.detalhe = detalhe
+    err.detalhe = detalhe
     throw err
   }
   const data = await r.json()
