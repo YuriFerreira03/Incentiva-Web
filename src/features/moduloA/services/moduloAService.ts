@@ -235,7 +235,8 @@ fatos. Se sugerir texto, apenas reorganize fatos já fornecidos.
 Para dados ausentes, faça uma pergunta em vez de inventar.
 Retorne somente JSON: status, aprovada, mensagem, sugestao,
 perguntaComplementar, inconsistencia.
-aprovada=true somente quando status=presente e sem conflito bloqueante.`
+aprovada=true somente quando status=presente e sem conflito bloqueante.
+Se não houver conflito, deixe "inconsistencia" como string vazia ("").`
 
 export async function validarResposta(
   campo: Dimensao,

@@ -96,7 +96,7 @@ export function consolidarPreAnalise(ia: PreAnaliseIA): PreAnalise {
   const presentes = DIMENSOES.filter((d) => ia.topicos[d].status === 'presente')
   const parciais = DIMENSOES.filter((d) => ia.topicos[d].status === 'parcial')
   const pendentes = DIMENSOES.filter((d) => ia.topicos[d].status !== 'presente')
-  const inconsistencias = ia.inconsistencias.map((s) => s.trim()).filter(Boolean)
+  const inconsistencias = ia.inconsistencias.map((s) => s.trim()).filter((s) => s && !semConflito(s))
 
   const suficiente = ia.ehTextoValido && pendentes.length === 0 && inconsistencias.length === 0
   const pontuacao = ia.ehTextoValido ? Math.round(12.5 * presentes.length + 6.25 * parciais.length) : 0
@@ -140,8 +140,13 @@ export const ValidacaoRespostaIASchema = z.object({
 export type ValidacaoRespostaIA = z.output<typeof ValidacaoRespostaIASchema>
 
 /** aprovada = status "presente" E nenhuma inconsistência (decisão do código). */
+// A IA às vezes escreve "Não há conflito" no campo de inconsistência; isso não é conflito.
+function semConflito(t: string): boolean {
+  return /^(n[aã]o h[aá]|nenhum|nenhuma|sem (conflito|inconsist)|inexistente|n\/a|-)/i.test(t.trim())
+}
+
 export function consolidarValidacao(ia: ValidacaoRespostaIA): ValidacaoResposta {
-  const inconsistencia = ia.inconsistencia.trim()
+  const inconsistencia = semConflito(ia.inconsistencia) ? '' : ia.inconsistencia.trim()
   const aprovada = ia.status === 'presente' && inconsistencia === ''
   const mensagem =
     ia.mensagem.trim() ||
